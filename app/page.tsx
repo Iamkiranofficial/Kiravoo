@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import "./motion.module.css";
 
 const examples = [
   "A cinematic drone shot flying over Hyderabad at sunset",
