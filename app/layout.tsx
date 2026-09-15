@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AssistantChat from "./components/AssistantChat";
 
 export const metadata: Metadata = {
   title: "KIRAVO — Create what you imagine",
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body>{children}<AssistantChat /></body></html>;
 }
