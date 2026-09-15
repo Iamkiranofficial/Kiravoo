@@ -63,8 +63,7 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not check the render status.");
       if (data.status === "complete" && data.url) {
-        setVideoUrl(data.url);
-        setStatus("done");
+        setVideoUrl(data.url); setStatus("done");
         saveHistory({ id, prompt: prompt.trim(), url: data.url, createdAt: new Date().toISOString(), aspectRatio, style, duration });
         return;
       }
@@ -80,10 +79,7 @@ export default function Home() {
     if (!value || status === "generating") return;
     setStatus("generating"); setError(""); setVideoUrl(""); setRenderStage("Starting your render…");
     try {
-      const response = await fetch("/api/generate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: value, model, aspectRatio, style, duration, audio }),
-      });
+      const response = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: value, model, aspectRatio, style, duration, audio }) });
       const data = await response.json();
       if (!response.ok || !data.id) throw new Error(data.error || "KIRAVO could not start the video.");
       await waitForVideo(data.id);
@@ -95,6 +91,15 @@ export default function Home() {
 
   return (
     <main className="shell">
+      <div className="floating-scene" aria-hidden="true">
+        <div className="float-orb orb-one" />
+        <div className="float-orb orb-two" />
+        <div className="float-ring ring-one" />
+        <div className="float-ring ring-two" />
+        <div className="float-slab slab-one"><span>K</span><small>WORLD 01</small></div>
+        <div className="float-slab slab-two"><span>✦</span><small>CREATE</small></div>
+      </div>
+
       <nav className="nav"><div className="brand"><span className="brand-mark">K</span><span>KIRAVO</span></div><div className="nav-links"><a href="#studio">Studio</a><a href="#history">History</a><a href="#works">Explore</a></div><button className="ghost">Sign in</button></nav>
       <section className="hero" id="studio">
         <div className="eyebrow"><span className="pulse" /> AI CREATIVE STUDIO</div>
