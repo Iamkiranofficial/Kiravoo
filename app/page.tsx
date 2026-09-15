@@ -39,6 +39,40 @@ export default function Home() {
   const estimatedCredits = duration * 24;
 
   useEffect(() => {
+    const root = document.documentElement;
+    let raf = 0;
+    let targetX = 0;
+    let targetY = 0;
+    let currentX = 0;
+    let currentY = 0;
+
+    const paint = () => {
+      currentX += (targetX - currentX) * 0.1;
+      currentY += (targetY - currentY) * 0.1;
+      root.style.setProperty("--kiravo-mx", currentX.toFixed(2));
+      root.style.setProperty("--kiravo-my", currentY.toFixed(2));
+      raf = requestAnimationFrame(paint);
+    };
+
+    const move = (event: PointerEvent) => {
+      targetX = (event.clientX / window.innerWidth - 0.5) * 2;
+      targetY = (event.clientY / window.innerHeight - 0.5) * 2;
+    };
+    const reset = () => { targetX = 0; targetY = 0; };
+
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("pointerleave", reset, { passive: true });
+    raf = requestAnimationFrame(paint);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerleave", reset);
+      cancelAnimationFrame(raf);
+      root.style.removeProperty("--kiravo-mx");
+      root.style.removeProperty("--kiravo-my");
+    };
+  }, []);
+
+  useEffect(() => {
     if (!durationOptions.includes(duration)) setDuration(durationOptions[0]);
     if (model === "wan-2.2" && audio) setAudio(false);
   }, [model]);
