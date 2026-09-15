@@ -1,5 +1,15 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
 
+function getErrorMessage(value: unknown) {
+  if (typeof value === "string" && value.trim()) return value;
+  if (value && typeof value === "object") {
+    const item = value as { message?: unknown; detail?: unknown };
+    if (typeof item.message === "string" && item.message.trim()) return item.message;
+    if (typeof item.detail === "string" && item.detail.trim()) return item.detail;
+  }
+  return "Magic Hour could not render the video.";
+}
+
 export async function GET(request: Request) {
   try {
     const apiKey = process.env.MAGIC_HOUR_API_KEY;
@@ -35,7 +45,7 @@ export async function GET(request: Request) {
       id: data?.id || id,
       status,
       url: status === "complete" ? url || null : null,
-      error: status === "error" ? data?.error || "Magic Hour could not render the video." : null,
+      error: status === "error" ? getErrorMessage(data?.error) : null,
     });
   } catch (error) {
     console.error("KIRAVO status error:", error);
