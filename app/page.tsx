@@ -26,8 +26,9 @@ export default function Home() {
 
   async function waitForVideo(id: string) {
     const startedAt = Date.now();
+    const maxWait = 15 * 60 * 1000;
 
-    while (Date.now() - startedAt < 5 * 60 * 1000) {
+    while (Date.now() - startedAt < maxWait) {
       const response = await fetch(`/api/generate/status?id=${encodeURIComponent(id)}`, {
         cache: "no-store",
       });
