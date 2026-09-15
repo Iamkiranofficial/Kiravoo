@@ -10,11 +10,36 @@ const examples = [
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
-  const [generated, setGenerated] = useState(false);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [status, setStatus] = useState<"idle" | "generating" | "done" | "error">("idle");
+  const [error, setError] = useState("");
 
-  function generate() {
-    if (!prompt.trim()) return;
-    setGenerated(true);
+  async function generate() {
+    const value = prompt.trim();
+    if (!value || status === "generating") return;
+
+    setStatus("generating");
+    setError("");
+    setVideoUrl("");
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: value }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "KIRAVO could not generate the video.");
+      }
+
+      setVideoUrl(data.url);
+      setStatus("done");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setStatus("error");
+    }
   }
 
   return (
@@ -31,10 +56,12 @@ export default function Home() {
         <p className="sub">KIRAVO turns a simple thought into cinematic direction, scenes, motion and visual stories.</p>
 
         <div className="composer">
-          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the video you imagine..." rows={3} />
+          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the video you imagine..." rows={3} disabled={status === "generating"} />
           <div className="composer-bottom">
-            <div className="chips"><button>16:9</button><button>10s</button><button>🎬 Cinematic</button></div>
-            <button className="generate" onClick={generate}>Generate <span>↗</span></button>
+            <div className="chips"><button type="button">16:9</button><button type="button">5s</button><button type="button">🎬 Cinematic</button></div>
+            <button className="generate" onClick={generate} disabled={!prompt.trim() || status === "generating"}>
+              {status === "generating" ? "Creating…" : "Generate"} <span>{status === "generating" ? "◌" : "↗"}</span>
+            </button>
           </div>
         </div>
 
@@ -43,7 +70,21 @@ export default function Home() {
           {examples.map((item) => <button key={item} onClick={() => setPrompt(item)}>{item}</button>)}
         </div>
 
-        {generated && <div className="result-card"><div className="result-orb" /><div><strong>Concept ready.</strong><p>KIRAVO has shaped your prompt into a cinematic direction. Connect a video model to render the final sequence.</p></div><span className="ready">READY</span></div>}
+        {status === "generating" && (
+          <div className="result-card"><div className="result-orb" /><div><strong>Rendering your world…</strong><p>KIRAVO is sending your direction to the video engine. This can take a little while.</p></div><span className="ready">RENDERING</span></div>
+        )}
+
+        {status === "error" && (
+          <div className="result-card error-card"><div className="result-orb" /><div><strong>Generation failed.</strong><p>{error}</p></div><button className="retry" onClick={generate}>Retry</button></div>
+        )}
+
+        {status === "done" && videoUrl && (
+          <div className="video-result">
+            <div className="video-head"><div><span className="eyebrow">YOUR KIRAVO WORLD</span><h2>Rendered in <em>motion.</em></h2></div><span className="ready">5 SEC · 16:9</span></div>
+            <video src={videoUrl} controls autoPlay playsInline className="generated-video" />
+            <div className="video-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><button className="retry" onClick={generate}>Create another</button></div>
+          </div>
+        )}
       </section>
 
       <section className="works" id="works">
@@ -51,7 +92,7 @@ export default function Home() {
         <div className="cards">
           <article><span className="number">01</span><div className="icon">✦</div><h3>Imagine</h3><p>Start with words. KIRAVO understands mood, camera language, setting and story.</p></article>
           <article><span className="number">02</span><div className="icon">◈</div><h3>Direct</h3><p>Shape your idea into scenes, shots and a coherent visual direction you can actually make.</p></article>
-          <article><span className="number">03</span><div className="icon">↗</div><h3>Create</h3><p>Render with the creative tools you choose. Keep the concept yours from first frame to final cut.</p></article>
+          <article><span className="number">03</span><div className="icon">↗</div><h3>Create</h3><p>Render with a real video model. Keep the concept yours from first frame to final cut.</p></article>
         </div>
       </section>
 
