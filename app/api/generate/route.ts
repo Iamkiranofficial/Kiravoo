@@ -1,9 +1,12 @@
-import { experimental_generateVideo as generateVideo } from "ai";
-
-export const maxDuration = 60;
+const MAGIC_HOUR_API = "https://api.magichour.ai";
 
 export async function POST(request: Request) {
   try {
+    const apiKey = process.env.MAGIC_HOUR_API_KEY;
+    if (!apiKey) {
+      return Response.json({ error: "KIRAVO is not connected to the video engine yet." }, { status: 500 });
+    }
+
     const body = await request.json();
     const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
 
@@ -15,35 +18,32 @@ export async function POST(request: Request) {
       return Response.json({ error: "Your prompt is too long." }, { status: 400 });
     }
 
-    const result = await generateVideo({
-      model: "alibaba/wan-v3.0-video",
-      prompt,
-      duration: 5,
-      aspectRatio: "16:9",
+    const response = await fetch(`${MAGIC_HOUR_API}/v1/text-to-video`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: `KIRAVO — ${new Date().toISOString()}`,
+        end_seconds: 5,
+        aspect_ratio: "16:9",
+        resolution: "480p",
+        model: "wan-2.2",
+        audio: false,
+        style: { prompt },
+      }),
     });
 
-    const video = result.videos?.[0] as unknown as {
-      url?: string;
-      base64?: string;
-      mediaType?: string;
-    } | undefined;
+    const data = await response.json().catch(() => ({}));
 
-    if (!video) {
-      throw new Error("The video model returned no video.");
+    if (!response.ok || !data.id) {
+      const message = typeof data?.message === "string" ? data.message : "Magic Hour could not start the video render.";
+      return Response.json({ error: message }, { status: response.status || 502 });
     }
 
-    if (video.url) {
-      return Response.json({ url: video.url, duration: 5 });
-    }
-
-    if (video.base64) {
-      return Response.json({
-        url: `data:${video.mediaType || "video/mp4"};base64,${video.base64}`,
-        duration: 5,
-      });
-    }
-
-    throw new Error("The generated video did not include a playable URL.");
+    return Response.json({ id: data.id, status: "queued", duration: 5 });
   } catch (error) {
     console.error("KIRAVO generation error:", error);
     const message = error instanceof Error ? error.message : "Video generation failed.";
