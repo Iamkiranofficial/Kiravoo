@@ -28,9 +28,10 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         name: `KIRAVO — ${new Date().toISOString()}`,
         end_seconds: 5,
+        orientation: "landscape",
         aspect_ratio: "16:9",
         resolution: "480p",
-        model: "wan-2.2",
+        model: "ltx-2.3",
         audio: false,
         style: { prompt },
       }),
