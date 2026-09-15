@@ -29,6 +29,16 @@ export default function AssistantChat() {
     } catch {}
   }, []);
 
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const button = target?.closest("button");
+      if (button?.textContent?.trim() === "Editor") window.location.href = "/editor";
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+
   const current = assistants.find((x) => x.id === assistant) || assistants[0];
 
   const send = async () => {
