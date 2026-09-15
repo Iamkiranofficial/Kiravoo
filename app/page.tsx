@@ -1,164 +1,137 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./motion.module.css";
 
-const examples = [
-  "A cinematic drone shot flying over Hyderabad at sunset",
-  "A tiny robot discovering a glowing forest at midnight",
-  "Luxury car commercial on a rain-soaked neon street",
-];
+type Status = "idle" | "generating" | "done" | "error";
+type Project = { id: string; prompt: string; url?: string; createdAt: string; aspectRatio: string; style: string; duration: number; model: string };
 
+const examples = [
+  "A cinematic drone shot flying over Hyderabad at sunset, warm light, realistic city details",
+  "A tiny robot discovering a glowing forest at midnight, volumetric light, gentle camera movement",
+  "Luxury car commercial on a rain-soaked neon street, premium reflections, slow motion",
+];
 const models = [
   { id: "ltx-2.3", label: "LTX 2.3", note: "Fast · audio" },
   { id: "wan-2.2", label: "Wan 2.2", note: "Detailed" },
 ];
 const ratios = ["16:9", "9:16", "1:1"];
 const styles = ["Cinematic", "Realistic", "Anime", "Commercial", "Dreamy"];
-const ltxDurations = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30];
-const wanDurations = [3, 4, 5, 6, 7, 8, 9, 10, 15];
-
-type Status = "idle" | "generating" | "done" | "error";
-type HistoryItem = { id: string; prompt: string; url: string; createdAt: string; aspectRatio: string; style: string; duration: number };
+const ltxDurations = [1,2,3,4,5,6,7,8,9,10,15,20,25,30];
+const wanDurations = [3,4,5,6,7,8,9,10,15];
+const nav = ["Studio", "Director", "History", "Explore", "Settings"];
 
 export default function Home() {
+  const [active, setActive] = useState("Studio");
   const [prompt, setPrompt] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const [renderStage, setRenderStage] = useState("Starting your render…");
+  const [videoUrl, setVideoUrl] = useState("");
   const [model, setModel] = useState("ltx-2.3");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [style, setStyle] = useState("Cinematic");
   const [duration, setDuration] = useState(1);
   const [audio, setAudio] = useState(false);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [history, setHistory] = useState<Project[]>([]);
+  const [scenes, setScenes] = useState<string[]>([]);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const durationOptions = model === "wan-2.2" ? wanDurations : ltxDurations;
   const estimatedCredits = duration * 24;
 
   useEffect(() => {
-    const root = document.documentElement;
-    let raf = 0;
-    let targetX = 0;
-    let targetY = 0;
-    let currentX = 0;
-    let currentY = 0;
-
-    const paint = () => {
-      currentX += (targetX - currentX) * 0.1;
-      currentY += (targetY - currentY) * 0.1;
-      root.style.setProperty("--kiravo-mx", currentX.toFixed(2));
-      root.style.setProperty("--kiravo-my", currentY.toFixed(2));
-      raf = requestAnimationFrame(paint);
-    };
-
-    const move = (event: PointerEvent) => {
-      targetX = (event.clientX / window.innerWidth - 0.5) * 2;
-      targetY = (event.clientY / window.innerHeight - 0.5) * 2;
-    };
-    const reset = () => { targetX = 0; targetY = 0; };
-
-    window.addEventListener("pointermove", move, { passive: true });
-    window.addEventListener("pointerleave", reset, { passive: true });
-    raf = requestAnimationFrame(paint);
-    return () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerleave", reset);
-      cancelAnimationFrame(raf);
-      root.style.removeProperty("--kiravo-mx");
-      root.style.removeProperty("--kiravo-my");
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!durationOptions.includes(duration)) setDuration(durationOptions[0]);
-    if (model === "wan-2.2" && audio) setAudio(false);
-  }, [model]);
-
-  useEffect(() => {
     try { setHistory(JSON.parse(localStorage.getItem("kiravo-history") || "[]")); } catch { setHistory([]); }
     return () => { if (pollTimer.current) clearTimeout(pollTimer.current); };
   }, []);
 
-  function saveHistory(item: HistoryItem) {
-    setHistory((current) => {
-      const next = [item, ...current.filter((entry) => entry.url !== item.url)].slice(0, 8);
-      localStorage.setItem("kiravo-history", JSON.stringify(next));
-      return next;
-    });
-  }
+  useEffect(() => {
+    if (!durationOptions.includes(duration)) setDuration(durationOptions[0]);
+    if (model === "wan-2.2") setAudio(false);
+  }, [model]);
 
-  async function waitForVideo(id: string) {
-    const startedAt = Date.now();
-    const maxWait = 15 * 60 * 1000;
-    while (Date.now() - startedAt < maxWait) {
-      const response = await fetch(`/api/generate/status?id=${encodeURIComponent(id)}`, { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not check the render status.");
-      if (data.status === "complete" && data.url) {
+  useEffect(() => {
+    const root = document.documentElement;
+    let raf = 0, tx = 0, ty = 0, cx = 0, cy = 0;
+    const paint = () => { cx += (tx-cx)*.1; cy += (ty-cy)*.1; root.style.setProperty("--kiravo-mx", cx.toFixed(2)); root.style.setProperty("--kiravo-my", cy.toFixed(2)); raf=requestAnimationFrame(paint); };
+    const move=(e:PointerEvent)=>{tx=(e.clientX/window.innerWidth-.5)*2;ty=(e.clientY/window.innerHeight-.5)*2;};
+    const reset=()=>{tx=0;ty=0;};
+    window.addEventListener("pointermove",move,{passive:true}); window.addEventListener("pointerleave",reset,{passive:true}); raf=requestAnimationFrame(paint);
+    return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerleave",reset);cancelAnimationFrame(raf);root.style.removeProperty("--kiravo-mx");root.style.removeProperty("--kiravo-my");};
+  }, []);
+
+  const saveHistory = (item: Project) => setHistory(current => { const next=[item,...current.filter(x=>x.url!==item.url)].slice(0,12); localStorage.setItem("kiravo-history",JSON.stringify(next)); return next; });
+
+  async function waitForVideo(id:string) {
+    const started=Date.now();
+    while(Date.now()-started<15*60*1000){
+      const r=await fetch(`/api/generate/status?id=${encodeURIComponent(id)}`,{cache:"no-store"});
+      const data=await r.json();
+      if(!r.ok) throw new Error(data.error||"Could not check the render status.");
+      if(data.status==="complete"&&data.url){
         setVideoUrl(data.url); setStatus("done");
-        saveHistory({ id, prompt: prompt.trim(), url: data.url, createdAt: new Date().toISOString(), aspectRatio, style, duration });
+        saveHistory({id,prompt:prompt.trim(),url:data.url,createdAt:new Date().toISOString(),aspectRatio,style,duration,model});
         return;
       }
-      if (data.status === "error" || data.status === "canceled") throw new Error(data.error || "The video render did not complete.");
-      setRenderStage(data.status === "queued" ? "Your render is queued…" : "Rendering your world…");
-      await new Promise<void>((resolve) => { pollTimer.current = setTimeout(resolve, 3000); });
+      if(data.status==="error"||data.status==="canceled") throw new Error(data.error||"The render did not complete.");
+      setRenderStage(data.status==="queued"?"Your render is queued…":"Rendering your world…");
+      await new Promise<void>(resolve=>{pollTimer.current=setTimeout(resolve,3000);});
     }
     throw new Error("The render is taking longer than expected. Please try again.");
   }
 
-  async function generate() {
-    const value = prompt.trim();
-    if (!value || status === "generating") return;
-    setStatus("generating"); setError(""); setVideoUrl(""); setRenderStage("Starting your render…");
-    try {
-      const response = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: value, model, aspectRatio, style, duration, audio }) });
-      const data = await response.json();
-      if (!response.ok || !data.id) throw new Error(data.error || "KIRAVO could not start the video.");
+  async function generate(){
+    const value=prompt.trim(); if(!value||status==="generating")return;
+    setStatus("generating");setError("");setVideoUrl("");setRenderStage("Starting your render…");
+    try{
+      const r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:value,model,aspectRatio,style,duration,audio})});
+      const data=await r.json(); if(!r.ok||!data.id)throw new Error(data.error||"KIRAVO could not start the video.");
       await waitForVideo(data.id);
-    } catch (err) {
-      if (pollTimer.current) clearTimeout(pollTimer.current);
-      setError(err instanceof Error ? err.message : "Something went wrong."); setStatus("error");
-    }
+    }catch(e){if(pollTimer.current)clearTimeout(pollTimer.current);setError(e instanceof Error?e.message:"Something went wrong.");setStatus("error");}
   }
 
-  return (
-    <main className="shell">
-      <div className="floating-scene" aria-hidden="true">
-        <div className="float-orb orb-one" />
-        <div className="float-orb orb-two" />
-        <div className="float-ring ring-one" />
-        <div className="float-ring ring-two" />
-        <div className="float-slab slab-one"><span>K</span><small>WORLD 01</small></div>
-        <div className="float-slab slab-two"><span>✦</span><small>CREATE</small></div>
-      </div>
+  function makeDirector(){
+    const p=prompt.trim()||"your idea";
+    setScenes([`Opening — establish the world and mood around ${p}.`,`Main moment — reveal the subject with controlled cinematic movement.`,`Final shot — resolve the story with a memorable composition.`]);
+  }
 
-      <nav className="nav"><div className="brand"><span className="brand-mark">K</span><span>KIRAVO</span></div><div className="nav-links"><a href="#studio">Studio</a><a href="#history">History</a><a href="#works">Explore</a></div><button className="ghost">Sign in</button></nav>
-      <section className="hero" id="studio">
-        <div className="eyebrow"><span className="pulse" /> AI CREATIVE STUDIO</div>
-        <h1>Turn an idea into<br /><em>a world.</em></h1>
-        <p className="sub">KIRAVO turns a simple thought into cinematic direction, scenes, motion and visual stories.</p>
+  const pageTitle=active==="Studio"?"Create a world":active==="Director"?"AI Director":active==="History"?"Your worlds":active==="Explore"?"The KIRAVO method":"Workspace settings";
+
+  return <main className="shell">
+    <div className="floating-scene" aria-hidden="true"><div className="float-orb orb-one"/><div className="float-orb orb-two"/><div className="float-ring ring-one"/><div className="float-ring ring-two"/><div className="float-slab slab-one"><span>K</span><small>WORLD 01</small></div><div className="float-slab slab-two"><span>✦</span><small>CREATE</small></div></div>
+
+    <nav className="nav"><div className="brand"><span className="brand-mark">K</span><span>KIRAVO</span></div><div className="nav-links">{nav.slice(0,4).map(n=><button key={n} className="nav-link-button" onClick={()=>setActive(n)}>{n}</button>)}</div><button className="ghost" onClick={()=>setActive("Settings")}>Settings</button></nav>
+
+    <section className="hero" id="studio">
+      <div className="eyebrow"><span className="pulse"/> AI CREATIVE STUDIO · {pageTitle.toUpperCase()}</div>
+      {active==="Studio"&&<>
+        <h1>Turn an idea into<br/><em>a world.</em></h1><p className="sub">KIRAVO turns a simple thought into cinematic direction, scenes, motion and visual stories — on desktop, laptop, tablet and mobile.</p>
         <div className="composer">
-          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the video you imagine..." rows={3} disabled={status === "generating"} />
+          <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Describe the video you imagine…" rows={3} disabled={status==="generating"}/>
           <div className="controls">
-            <label>Model<select value={model} onChange={(e) => setModel(e.target.value)} disabled={status === "generating"}>{models.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.note}</option>)}</select></label>
-            <label>Frame<select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} disabled={status === "generating"}>{ratios.map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label>Style<select value={style} onChange={(e) => setStyle(e.target.value)} disabled={status === "generating"}>{styles.map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label>Length<select value={duration} onChange={(e) => setDuration(Number(e.target.value))} disabled={status === "generating"}>{durationOptions.map((item) => <option key={item} value={item}>{item}s · ~{item * 24} credits</option>)}</select></label>
-            <button type="button" className={`toggle ${audio ? "on" : ""}`} onClick={() => setAudio(!audio)} disabled={status === "generating" || model === "wan-2.2"}><span>{audio ? "●" : "○"}</span> Audio{model === "wan-2.2" ? " · N/A" : ""}</button>
+            <label>Model<select value={model} onChange={e=>setModel(e.target.value)} disabled={status==="generating"}>{models.map(m=><option key={m.id} value={m.id}>{m.label} · {m.note}</option>)}</select></label>
+            <label>Frame<select value={aspectRatio} onChange={e=>setAspectRatio(e.target.value)} disabled={status==="generating"}>{ratios.map(r=><option key={r}>{r}</option>)}</select></label>
+            <label>Style<select value={style} onChange={e=>setStyle(e.target.value)} disabled={status==="generating"}>{styles.map(s=><option key={s}>{s}</option>)}</select></label>
+            <label>Length<select value={duration} onChange={e=>setDuration(Number(e.target.value))} disabled={status==="generating"}>{durationOptions.map(d=><option key={d} value={d}>{d}s · ~{d*24} credits</option>)}</select></label>
+            <button className={`toggle ${audio?"on":""}`} onClick={()=>setAudio(v=>!v)} disabled={status==="generating"||model==="wan-2.2"}>{audio?"●":"○"} Audio{model==="wan-2.2"?" · N/A":""}</button>
           </div>
-          <div className="composer-bottom"><div className="chips"><span>{aspectRatio}</span><span>{duration}s</span><span>{style}</span><span>~{estimatedCredits} credits</span></div><button className="generate" onClick={generate} disabled={!prompt.trim() || status === "generating"}>{status === "generating" ? "Creating…" : "Generate"} <span>{status === "generating" ? "◌" : "↗"}</span></button></div>
+          <div className="composer-bottom"><div className="chips"><span>{aspectRatio}</span><span>{duration}s</span><span>{style}</span><span>~{estimatedCredits} credits</span></div><button className="generate" onClick={generate} disabled={!prompt.trim()||status==="generating"}>{status==="generating"?"Creating…":"Generate"} <span>↗</span></button></div>
         </div>
-        <div className="suggestions"><span>Try an idea</span>{examples.map((item) => <button key={item} onClick={() => setPrompt(item)}>{item}</button>)}</div>
-        {status === "generating" && <div className="result-card"><div className="result-orb" /><div><strong>{renderStage}</strong><p>KIRAVO is rendering your direction. Keep this tab open while the video is being created.</p></div><span className="ready">RENDERING</span></div>}
-        {status === "error" && <div className="result-card error-card"><div className="result-orb" /><div><strong>Generation failed.</strong><p>{error}</p></div><button className="retry" onClick={generate}>Retry</button></div>}
-        {status === "done" && videoUrl && <div className="video-result"><div className="video-head"><div><span className="eyebrow">YOUR KIRAVO WORLD</span><h2>Rendered in <em>motion.</em></h2></div><span className="ready">{duration} SEC · {aspectRatio}</span></div><video src={videoUrl} controls autoPlay playsInline className={`generated-video ratio-${aspectRatio.replace(":", "-")}`} /><div className="video-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><button className="retry" onClick={generate}>Create another</button></div></div>}
-      </section>
-      {history.length > 0 && <section className="history" id="history"><div className="section-head"><div><span className="eyebrow">YOUR CREATIONS</span><h2>Recent <em>worlds.</em></h2></div><span className="index">{history.length} SAVED</span></div><div className="history-grid">{history.map((item) => <article key={item.id}><video src={item.url} muted playsInline preload="metadata" /><div><span className="history-meta">{item.aspectRatio} · {item.style} · {item.duration}s</span><p>{item.prompt}</p><a href={item.url} target="_blank" rel="noreferrer">Open ↗</a></div></article>)}</div></section>}
-      <section className="works" id="works"><div className="section-head"><div><span className="eyebrow">THE KIRAVO METHOD</span><h2>From thought to <em>motion.</em></h2></div><span className="index">01 — 03</span></div><div className="cards"><article><span className="number">01</span><div className="icon">✦</div><h3>Imagine</h3><p>Start with words. KIRAVO understands mood, camera language, setting and story.</p></article><article><span className="number">02</span><div className="icon">◈</div><h3>Direct</h3><p>Shape your idea with model, frame, style, duration and audio controls before rendering.</p></article><article><span className="number">03</span><div className="icon">↗</div><h3>Create</h3><p>Render with a real video model and keep your creations available in this browser.</p></article></div></section>
-      <footer id="about"><div className="brand"><span className="brand-mark">K</span><span>KIRAVO</span></div><span>Make something nobody has seen before.</span><span>© 2026 KIRAVO</span></footer>
-    </main>
-  );
+        <div className="suggestions"><span>Try an idea</span>{examples.map(x=><button key={x} onClick={()=>setPrompt(x)}>{x}</button>)}</div>
+        {status==="generating"&&<div className="result-card"><div className="result-orb"/><div><strong>{renderStage}</strong><p>KIRAVO is rendering with the real video engine. Keep this tab open while the job completes.</p></div><span className="ready">RENDERING</span></div>}
+        {status==="error"&&<div className="result-card error-card"><div className="result-orb"/><div><strong>Generation failed.</strong><p>{error}</p></div><button className="retry" onClick={generate}>Retry</button></div>}
+        {status==="done"&&videoUrl&&<div className="video-result"><div className="video-head"><div><span className="eyebrow">YOUR KIRAVO WORLD</span><h2>Rendered in <em>motion.</em></h2></div><span className="ready">{duration} SEC · {aspectRatio}</span></div><video src={videoUrl} controls autoPlay playsInline className={`generated-video ratio-${aspectRatio.replace(":","-")}`}/><div className="video-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><button className="retry" onClick={()=>{setPrompt("");setStatus("idle");setVideoUrl("")}}>Create another</button></div></div>}
+      </>}
+
+      {active==="Director"&&<div className="feature-panel"><h2>Shape the story before you render.</h2><p className="sub">Turn one prompt into editable shots, then send the direction to the renderer.</p><textarea value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Describe your story…"/><button className="generate" onClick={makeDirector}>Build scene plan ↗</button><div className="director-scenes">{scenes.map((s,i)=><article key={i}><span>0{i+1}</span><div><b>{s.split(" — ")[0]}</b><p>{s.split(" — ")[1]}</p></div></article>)}</div></div>}
+
+      {active==="History"&&<div className="feature-panel"><h2>Recent <em>worlds.</em></h2><p className="sub">Your latest real renders stay available here in this browser.</p>{history.length?<div className="history-grid">{history.map(item=><article key={item.id}><video src={item.url} muted playsInline controls preload="metadata"/><div><span className="history-meta">{item.model} · {item.aspectRatio} · {item.style} · {item.duration}s</span><p>{item.prompt}</p><a href={item.url} target="_blank" rel="noreferrer">Open ↗</a></div></article>)}</div>:<div className="empty-state">No renders yet. Create your first world in Studio.</div>}</div>}
+
+      {active==="Explore"&&<div className="feature-panel"><h2>From thought to <em>motion.</em></h2><p className="sub">A complete creative loop: imagine, direct, create.</p><div className="cards"><article><span className="number">01</span><div className="icon">✦</div><h3>Imagine</h3><p>Start with words. Describe the subject, setting, mood and camera language.</p></article><article><span className="number">02</span><div className="icon">◈</div><h3>Direct</h3><p>Choose model, frame, style, duration and audio before committing credits.</p></article><article><span className="number">03</span><div className="icon">↗</div><h3>Create</h3><p>Render through KIRAVO's server-side video engine and watch the result arrive.</p></article></div></div>}
+
+      {active==="Settings"&&<div className="feature-panel"><h2>Workspace <em>settings.</em></h2><p className="sub">KIRAVO is configured for responsive web use. Your video API key stays server-side.</p><div className="settings-grid"><div><label>Display name<input placeholder="KIRAVO creator"/></label><label>Email<input type="email" placeholder="you@example.com"/></label></div><div className="settings-status"><div><span>Video engine</span><b>Connected</b></div><div><span>Responsive web</span><b>Desktop · Tablet · Mobile</b></div><div><span>Generation</span><b>Magic Hour</b></div></div></div></div>}
+    </section>
+
+    <footer><div className="brand"><span className="brand-mark">K</span><span>KIRAVO</span></div><span>Make something nobody has seen before.</span><span>© 2026 KIRAVO</span></footer>
+  </main>;
 }
