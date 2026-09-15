@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const examples = [
   "A cinematic drone shot flying over Hyderabad at sunset",
@@ -8,11 +8,53 @@ const examples = [
   "Luxury car commercial on a rain-soaked neon street",
 ];
 
+type Status = "idle" | "generating" | "done" | "error";
+
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
-  const [status, setStatus] = useState<"idle" | "generating" | "done" | "error">("idle");
+  const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
+  const [renderStage, setRenderStage] = useState("Starting your render…");
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+    };
+  }, []);
+
+  async function waitForVideo(id: string) {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < 5 * 60 * 1000) {
+      const response = await fetch(`/api/generate/status?id=${encodeURIComponent(id)}`, {
+        cache: "no-store",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not check the render status.");
+      }
+
+      if (data.status === "complete" && data.url) {
+        setVideoUrl(data.url);
+        setStatus("done");
+        return;
+      }
+
+      if (data.status === "error" || data.status === "canceled") {
+        throw new Error(data.error || "Magic Hour could not render the video.");
+      }
+
+      setRenderStage(data.status === "queued" ? "Your render is queued…" : "Rendering your world…");
+      await new Promise<void>((resolve) => {
+        pollTimer.current = setTimeout(resolve, 3000);
+      });
+    }
+
+    throw new Error("The render is taking longer than expected. Please try again.");
+  }
 
   async function generate() {
     const value = prompt.trim();
@@ -21,6 +63,7 @@ export default function Home() {
     setStatus("generating");
     setError("");
     setVideoUrl("");
+    setRenderStage("Starting your render…");
 
     try {
       const response = await fetch("/api/generate", {
@@ -30,13 +73,13 @@ export default function Home() {
       });
       const data = await response.json();
 
-      if (!response.ok || !data.url) {
-        throw new Error(data.error || "KIRAVO could not generate the video.");
+      if (!response.ok || !data.id) {
+        throw new Error(data.error || "KIRAVO could not start the video.");
       }
 
-      setVideoUrl(data.url);
-      setStatus("done");
+      await waitForVideo(data.id);
     } catch (err) {
+      if (pollTimer.current) clearTimeout(pollTimer.current);
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setStatus("error");
     }
@@ -71,7 +114,7 @@ export default function Home() {
         </div>
 
         {status === "generating" && (
-          <div className="result-card"><div className="result-orb" /><div><strong>Rendering your world…</strong><p>KIRAVO is sending your direction to the video engine. This can take a little while.</p></div><span className="ready">RENDERING</span></div>
+          <div className="result-card"><div className="result-orb" /><div><strong>{renderStage}</strong><p>KIRAVO is sending your direction to the video engine. This can take a little while.</p></div><span className="ready">RENDERING</span></div>
         )}
 
         {status === "error" && (
