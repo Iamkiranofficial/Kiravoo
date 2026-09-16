@@ -1,11 +1,12 @@
 {
   "name": "kiravo",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "engines": {"node": ">=22"},
   "scripts": {"dev":"next dev","build":"next build","start":"next start"},
   "dependencies": {
     "ai": "7.0.100",
+    "ffmpeg-static": "5.2.0",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"
