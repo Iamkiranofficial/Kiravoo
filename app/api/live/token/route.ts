@@ -21,18 +21,6 @@ export async function POST() {
         uses: 1,
         expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
         newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
-        liveConnectConstraints: {
-          model: `models/${MODEL}`,
-          config: {
-            responseModalities: ["AUDIO"],
-            inputAudioTranscription: {},
-            outputAudioTranscription: {},
-            contextWindowCompression: {
-              slidingWindow: { targetTokens: 8000 },
-              triggerTokens: 20000,
-            },
-          },
-        },
       }),
     });
 
