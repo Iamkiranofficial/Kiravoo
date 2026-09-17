@@ -23,13 +23,18 @@ function extractVideoUrl(value: unknown): string | null {
   return null;
 }
 
-async function readFreeJob(eventId: string) {
+async function readFreeJob(encodedJob: string) {
   const token = process.env.HF_TOKEN;
   if (!token) return Response.json({ error: "HF_TOKEN is not configured.", provider: "huggingface" }, { status: 503 });
+
+  const separator = encodedJob.indexOf(":");
+  const endpoint = separator >= 0 ? decodeURIComponent(encodedJob.slice(0, separator)) : "generate_video";
+  const eventId = separator >= 0 ? encodedJob.slice(separator + 1) : encodedJob;
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7000);
   try {
-    const response = await fetch(`${HF_SPACE}/gradio_api/call/generate_video/${encodeURIComponent(eventId)}`, {
+    const response = await fetch(`${HF_SPACE}/gradio_api/call/${encodeURIComponent(endpoint)}/${encodeURIComponent(eventId)}`, {
       cache: "no-store",
       signal: controller.signal,
       headers: { Authorization: `Bearer ${token}` },
