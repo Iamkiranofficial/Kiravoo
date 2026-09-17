@@ -1,5 +1,6 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
-const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
+const HF_SPACE_ID = "Lightricks/ltx-video-distilled";
+const HF_FALLBACK_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
 
 function getErrorMessage(value: unknown) {
   if (typeof value === "string" && value.trim()) return value;
@@ -11,18 +12,30 @@ function getErrorMessage(value: unknown) {
   return "Video generation failed.";
 }
 
+async function resolveSpaceHost(token: string) {
+  try {
+    const response = await fetch(`https://huggingface.co/api/spaces/${HF_SPACE_ID}/host`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      if (typeof data?.host === "string" && data.host.startsWith("https://")) return data.host.replace(/\/$/, "");
+    }
+  } catch {}
+  return HF_FALLBACK_SPACE;
+}
+
 async function readFreeJob(eventId: string) {
   const token = process.env.HF_TOKEN;
   if (!token) return Response.json({ error: "HF_TOKEN is missing." }, { status: 503 });
 
+  const spaceHost = await resolveSpaceHost(token);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7000);
   try {
-    const response = await fetch(`${HF_SPACE}/gradio_api/call/text_to_video/${encodeURIComponent(eventId)}`, {
-      headers: {
-        "X-HF-Authorization": `Bearer ${token}`,
-        Authorization: `Bearer ${token}`,
-      },
+    const response = await fetch(`${spaceHost}/gradio_api/call/text_to_video/${encodeURIComponent(eventId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
       signal: controller.signal,
     });
