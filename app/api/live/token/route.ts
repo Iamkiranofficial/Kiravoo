@@ -25,8 +25,6 @@ export async function POST() {
           model: `models/${MODEL}`,
           config: {
             responseModalities: ["AUDIO"],
-            inputAudioTranscription: {},
-            outputAudioTranscription: {},
           },
         },
       }),
