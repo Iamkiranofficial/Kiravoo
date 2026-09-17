@@ -1,5 +1,5 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
-const HF_SPACE = "https://huggingface.co";
+const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
 
 function getErrorMessage(value: unknown) {
   if (typeof value === "string" && value.trim()) return value;
@@ -18,17 +18,13 @@ async function readFreeJob(eventId: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7000);
   try {
-    const response = await fetch(`${HF_SPACE}/api/spaces/Lightricks/ltx-video-distilled/gradio_api/call/text_to_video/${encodeURIComponent(eventId)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-      signal: controller.signal,
+    const response = await fetch(`${HF_SPACE}/gradio_api/call/text_to_video/${encodeURIComponent(eventId)}`, {
+      headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: controller.signal,
     });
-
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       return Response.json({ error: getErrorMessage(data), provider: "huggingface" }, { status: response.status || 502 });
     }
-
     const text = await response.text();
     const events = text.split("\n\n").filter(Boolean);
     let lastStatus = "processing";
@@ -53,32 +49,22 @@ async function readFreeJob(eventId: string) {
     }
     return Response.json({ status: lastStatus === "queued" ? "queued" : "processing", url: null, provider: "huggingface" });
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      return Response.json({ status: "processing", url: null, provider: "huggingface" });
-    }
+    if (error instanceof Error && error.name === "AbortError") return Response.json({ status: "processing", url: null, provider: "huggingface" });
     throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
+  } finally { clearTimeout(timeout); }
 }
 
 export async function GET(request: Request) {
   try {
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return Response.json({ error: "Missing video job id." }, { status: 400 });
-
     if (id.startsWith("hf:")) return readFreeJob(id.slice(3));
 
     const apiKey = process.env.MAGIC_HOUR_API_KEY;
     if (!apiKey) return Response.json({ error: "KIRAVO is not connected to a video engine." }, { status: 503 });
-
-    const response = await fetch(`${MAGIC_HOUR_API}/v1/video-projects/${encodeURIComponent(id)}`, {
-      headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}` },
-      cache: "no-store",
-    });
+    const response = await fetch(`${MAGIC_HOUR_API}/v1/video-projects/${encodeURIComponent(id)}`, { headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}` }, cache: "no-store" });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) return Response.json({ error: getErrorMessage(data), provider: "magichour" }, { status: response.status || 502 });
-
     const status = data?.status;
     const url = Array.isArray(data?.downloads) ? data.downloads[0]?.url : undefined;
     return Response.json({ id: data?.id || id, status, url: status === "complete" ? url || null : null, error: status === "error" ? getErrorMessage(data?.error) : null, provider: "magichour" });
