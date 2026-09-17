@@ -82,7 +82,6 @@ export default function AssistantChat() {
   const nextPlayTimeRef = useRef(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const liveAssistantTextRef = useRef("");
-  const liveUserTextRef = useRef("");
 
   useEffect(() => {
     try {
@@ -128,7 +127,10 @@ export default function AssistantChat() {
     processorRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
-    if (inputContextRef.current) { inputContextRef.current.close().catch(() => {}); inputContextRef.current = null; }
+    if (inputContextRef.current) {
+      inputContextRef.current.close().catch(() => {});
+      inputContextRef.current = null;
+    }
   };
 
   const stopLive = () => {
@@ -171,19 +173,31 @@ export default function AssistantChat() {
   const connectLive = async () => {
     if (live || connecting) return;
     setVoiceError("");
-    if (!window.isSecureContext) { setVoiceError("Live voice requires HTTPS. Open KIRAVO from kiravoo.vercel.app."); return; }
-    if (!navigator.mediaDevices?.getUserMedia) { setVoiceError("This browser does not provide microphone access."); return; }
+    if (!window.isSecureContext) {
+      setVoiceError("Live voice requires HTTPS. Open KIRAVO from kiravoo.vercel.app.");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setVoiceError("This browser does not provide microphone access.");
+      return;
+    }
 
     setConnecting(true);
     try {
       const tokenResponse = await fetch("/api/live/token", { method: "POST" });
       const tokenData = await tokenResponse.json().catch(() => ({}));
-      if (!tokenResponse.ok || !tokenData.token) throw new Error(tokenData.error || "Gemini Live is not connected.");
+      if (!tokenResponse.ok || !tokenData.token) {
+        throw new Error(tokenData.error || "Gemini Live is not connected.");
+      }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
       streamRef.current = stream;
+
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) throw new Error("This browser does not support live audio.");
+
       const inputContext = new AudioCtx();
       inputContextRef.current = inputContext;
       const outputContext = outputContextRef.current || new AudioContext({ sampleRate: 24000 });
@@ -191,7 +205,10 @@ export default function AssistantChat() {
       await inputContext.resume();
       await outputContext.resume();
 
-      const ws = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(tokenData.token)}`);
+      // Ephemeral Gemini Live tokens connect through the v1beta constrained endpoint.
+      const ws = new WebSocket(
+        `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(tokenData.token)}`
+      );
       socketRef.current = ws;
 
       const connectionTimeout = window.setTimeout(() => {
@@ -219,22 +236,25 @@ export default function AssistantChat() {
       ws.onmessage = async (event) => {
         let response: any;
         try { response = JSON.parse(event.data); } catch { return; }
+
         if (response?.error) {
           clearTimeout(connectionTimeout);
           setVoiceError(response.error.message || "Gemini Live returned an error.");
           return;
         }
+
         if (response?.setupComplete) {
           clearTimeout(connectionTimeout);
           setLive(true);
           setConnecting(false);
           return;
         }
+
         const content = response?.serverContent;
         if (!content) return;
-
         if (content.interrupted) stopPlayback();
         if (content.interimInputTranscription?.text) setInput(content.interimInputTranscription.text);
+
         if (content.inputTranscription?.text) {
           const text = content.inputTranscription.text.trim();
           if (text) {
@@ -242,15 +262,17 @@ export default function AssistantChat() {
             setInput("");
           }
         }
+
         if (content.outputTranscription?.text) addAssistantTranscript(content.outputTranscription.text);
+
         for (const part of content.modelTurn?.parts || []) {
           if (part?.inlineData?.data && String(part.inlineData.mimeType || "").startsWith("audio/pcm")) {
             await playPcm24(part.inlineData.data);
           }
         }
+
         if (content.turnComplete) {
           liveAssistantTextRef.current = "";
-          liveUserTextRef.current = "";
           setInput("");
         }
       };
@@ -259,13 +281,14 @@ export default function AssistantChat() {
         clearTimeout(connectionTimeout);
         setVoiceError("Gemini Live connection failed. Try again; if it persists, check the Gemini API key in Vercel.");
       };
+
       ws.onclose = (event) => {
         clearTimeout(connectionTimeout);
         cleanupAudio();
         socketRef.current = null;
         setLive(false);
         setConnecting(false);
-        if (event.code !== 1000 && event.code !== 1001 && !voiceError) {
+        if (event.code !== 1000 && event.code !== 1001) {
           setVoiceError(event.reason || `Gemini Live disconnected (code ${event.code}).`);
         }
       };
@@ -276,8 +299,13 @@ export default function AssistantChat() {
       processor.onaudioprocess = (event) => {
         if (ws.readyState !== WebSocket.OPEN) return;
         const samples = downsampleTo16k(event.inputBuffer.getChannelData(0), inputContext.sampleRate);
-        ws.send(JSON.stringify({ realtimeInput: { audio: { data: int16ToBase64(samples), mimeType: "audio/pcm;rate=16000" } } }));
+        ws.send(JSON.stringify({
+          realtimeInput: {
+            audio: { data: int16ToBase64(samples), mimeType: "audio/pcm;rate=16000" },
+          },
+        }));
       };
+
       const silentGain = inputContext.createGain();
       silentGain.gain.value = 0;
       source.connect(processor);
@@ -293,27 +321,43 @@ export default function AssistantChat() {
     }
   };
 
-  const toggleLive = () => { if (live || connecting) stopLive(); else connectLive(); };
+  const toggleLive = () => {
+    if (live || connecting) stopLive();
+    else connectLive();
+  };
 
   const sendText = async () => {
     const text = input.trim();
     if (!text) return;
     setInput("");
     setMessages((items) => [...items, { role: "user", content: text }]);
+
     if (live && socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text }] }], turnComplete: true } }));
+      socketRef.current.send(JSON.stringify({
+        clientContent: {
+          turns: [{ role: "user", parts: [{ text }] }],
+          turnComplete: true,
+        },
+      }));
       return;
     }
+
     setBusy(true);
     try {
       const next = [...messages, { role: "user" as const, content: text }];
-      const r = await fetch("/api/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assistant, language, messages: next }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "Assistant is unavailable right now.");
-      setMessages((items) => [...items, { role: "assistant", content: d.text || "I'm ready. What should we create?" }]);
+      const response = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assistant, language, messages: next }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Assistant is unavailable right now.");
+      setMessages((items) => [...items, { role: "assistant", content: data.text || "I'm ready. What should we create?" }]);
     } catch (error) {
       setMessages((items) => [...items, { role: "assistant", content: error instanceof Error ? error.message : "Something went wrong." }]);
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   return <div className="kiravo-assistant-chat">
@@ -325,22 +369,42 @@ export default function AssistantChat() {
         </div>
         <button onClick={() => setOpen(false)}>×</button>
       </header>
+
       <div className="assistant-chat-tools">
-        <select value={assistant} onChange={e=>{setAssistant(e.target.value);localStorage.setItem("kiravo-assistant",e.target.value)}}>{assistants.map(x=><option key={x.id} value={x.id}>{x.name} · {x.tag}</option>)}</select>
-        <select value={language} onChange={e=>{setLanguage(e.target.value);localStorage.setItem("kiravo-language",e.target.value)}}>{Object.keys(languageMap).map(x=><option key={x}>{x}</option>)}</select>
+        <select value={assistant} onChange={(e) => { setAssistant(e.target.value); localStorage.setItem("kiravo-assistant", e.target.value); }}>
+          {assistants.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.tag}</option>)}
+        </select>
+        <select value={language} onChange={(e) => { setLanguage(e.target.value); localStorage.setItem("kiravo-language", e.target.value); }}>
+          {Object.keys(languageMap).map((x) => <option key={x}>{x}</option>)}
+        </select>
       </div>
+
       <div className="assistant-chat-messages">
-        {messages.length===0&&<div className="assistant-chat-welcome"><span>{current.orb}</span><h3>Hey, I’m {current.name}.</h3><p>Tap the microphone and talk naturally. KIRAVO will listen, respond, and speak back.</p><button className="voice-start" onClick={toggleLive}>🎙 Start voice conversation</button></div>}
-        {messages.map((m,i)=><div key={`${m.role}-${i}`} className={`assistant-message ${m.role}`}>{m.content}</div>)}
-        {busy&&<div className="assistant-message assistant typing">Thinking…</div>}
+        {messages.length === 0 && <div className="assistant-chat-welcome">
+          <span>{current.orb}</span>
+          <h3>Hey, I’m {current.name}.</h3>
+          <p>Tap the microphone and talk naturally. KIRAVO will listen, respond, and speak back.</p>
+          <button className="voice-start" onClick={toggleLive}>🎙 Start voice conversation</button>
+        </div>}
+        {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`assistant-message ${message.role}`}>{message.content}</div>)}
+        {busy && <div className="assistant-message assistant typing">Thinking…</div>}
       </div>
-      {voiceError&&<div className="assistant-voice-error">{voiceError}</div>}
+
+      {voiceError && <div className="assistant-voice-error">{voiceError}</div>}
+
       <div className="assistant-chat-input">
-        <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendText()}}} placeholder={live?`Talk to ${current.name}…`:`Message ${current.name}…`} rows={1} disabled={busy}/>
-        <button className={`mic-button ${live?"active":""}`} onClick={toggleLive} disabled={busy} aria-label={live?"Stop live conversation":"Start live conversation"}>{live?"■":"🎙"}</button>
-        <button onClick={sendText} disabled={!input.trim()||busy}>↑</button>
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); } }}
+          placeholder={live ? `Talk to ${current.name}…` : `Message ${current.name}…`}
+          rows={1}
+          disabled={busy}
+        />
+        <button className={`mic-button ${live ? "active" : ""}`} onClick={toggleLive} disabled={busy} aria-label={live ? "Stop live conversation" : "Start live conversation"}>{live ? "■" : "🎙"}</button>
+        <button onClick={sendText} disabled={!input.trim() || busy}>↑</button>
       </div>
     </section>}
-    <button className="assistant-chat-launcher" onClick={()=>setOpen(x=>!x)}><span>{current.orb}</span><b>{open?"Close":"AI"}</b></button>
+    <button className="assistant-chat-launcher" onClick={() => setOpen((value) => !value)}><span>{current.orb}</span><b>{open ? "Close" : "AI"}</b></button>
   </div>;
 }
