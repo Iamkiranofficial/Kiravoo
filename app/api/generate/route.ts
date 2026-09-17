@@ -1,5 +1,8 @@
+import { Client } from "@gradio/client";
+
 const MAGIC_HOUR_API = "https://api.magichour.ai";
 const HF_SPACE = "https://lightricks-ltx-2-3.hf.space";
+const HF_SPACE_ID = "Lightricks/LTX-2-3";
 
 const allowedModels = new Set(["ltx-2.3", "wan-2.2"]);
 const allowedRatios = new Set(["16:9", "9:16", "1:1"]);
@@ -10,7 +13,7 @@ const wanDurations = new Set([3, 4, 5, 6, 7, 8]);
 function dimensions(aspectRatio: string) {
   if (aspectRatio === "9:16") return { height: 1536, width: 864 };
   if (aspectRatio === "1:1") return { height: 1024, width: 1024 };
-  return { height: 864, width: 1536 };
+  return { height: 1024, width: 1536 };
 }
 
 async function submitFreeVideo(prompt: string, aspectRatio: string, duration: number, style: string) {
@@ -21,24 +24,24 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
 
-  // LTX-2.3 exposes the standard Gradio queue API at /call/generate_video.
-  // The endpoint uses the eight positional inputs declared by the Space.
-  const response = await fetch(`${HF_SPACE}/gradio_api/call/generate_video`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      data: [null, styledPrompt, actualDuration, false, 42, true, height, width],
-    }),
-  });
+  // Use Hugging Face's official Gradio JS client. It discovers the live API
+  // endpoint instead of hard-coding a route that can change with Gradio.
+  const app = await Client.connect(HF_SPACE_ID, { token, events: ["status", "data"] });
+  const api = await app.view_api();
+  let endpoint: string | number = "/generate_video";
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.event_id) {
-    const message = typeof data?.detail === "string" ? data.detail : typeof data?.message === "string" ? data.message : `Hugging Face LTX-2.3 returned HTTP ${response.status}.`;
-    return Response.json({ error: message, provider: "huggingface", httpStatus: response.status }, { status: response.status || 502 });
+  if (!api.named_endpoints?.[endpoint]) {
+    const unnamed = Object.keys(api.unnamed_endpoints || {});
+    if (!unnamed.length) throw new Error("LTX-2.3 did not expose a callable generation endpoint.");
+    endpoint = Number(unnamed[0]);
   }
 
+  const job = app.submit(endpoint, [null, styledPrompt, actualDuration, false, 42, true, height, width]);
+  const eventId = await (job as any).event_id();
+  if (!eventId) throw new Error("Hugging Face did not return a generation event ID.");
+
   return Response.json({
-    id: `hf:${data.event_id}`,
+    id: `hf:${encodeURIComponent(String(endpoint))}:${eventId}`,
     provider: "huggingface",
     status: "queued",
     duration: actualDuration,
@@ -66,8 +69,6 @@ export async function POST(request: Request) {
     const supportedDurations = model === "wan-2.2" ? wanDurations : ltxDurations;
     if (!supportedDurations.has(duration)) return Response.json({ error: `${model} supports ${model === "wan-2.2" ? "3–8" : "1–8"} seconds on the free engine.` }, { status: 400 });
 
-    // Until a dedicated free Wan endpoint is connected, route both UI models
-    // through the free LTX-2.3 engine rather than charging Magic Hour.
     if (process.env.HF_TOKEN) return submitFreeVideo(prompt, aspectRatio, duration, style);
 
     const apiKey = process.env.MAGIC_HOUR_API_KEY;
