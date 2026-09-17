@@ -22,10 +22,6 @@ export async function POST() {
         uses: 1,
         expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
         newSessionExpireTime: new Date(now + 5 * 60 * 1000).toISOString(),
-        fieldMask: "model",
-        bidiGenerateContentSetup: {
-          model: `models/${MODEL}`,
-        },
       }),
     });
 
@@ -38,8 +34,16 @@ export async function POST() {
       );
     }
 
+    if (!data?.name) {
+      console.error("Gemini Live token response did not include a token:", data);
+      return Response.json(
+        { error: "Gemini Live did not return an authentication token." },
+        { status: 502, headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
     return Response.json(
-      { token: data?.name, model: MODEL },
+      { token: data.name, model: MODEL },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
