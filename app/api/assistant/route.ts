@@ -1,4 +1,4 @@
-const MODEL = process.env.KIRAVO_ASSISTANT_MODEL || "gemini-3.8-flash";
+const MODEL = process.env.KIRAVO_ASSISTANT_MODEL || "gemini-3.6-flash";
 
 const personalities: Record<string,string> = {
   aria: "You are ARIA, KIRAVO's visionary creative partner. Be bold, cinematic, imaginative and decisive.",
