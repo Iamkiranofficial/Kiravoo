@@ -1,4 +1,5 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
+const HF_SPACE = "https://huggingface.co";
 
 function getErrorMessage(value: unknown) {
   if (typeof value === "string" && value.trim()) return value;
@@ -7,49 +8,82 @@ function getErrorMessage(value: unknown) {
     if (typeof item.message === "string" && item.message.trim()) return item.message;
     if (typeof item.detail === "string" && item.detail.trim()) return item.detail;
   }
-  return "Magic Hour could not render the video.";
+  return "Video generation failed.";
+}
+
+async function readFreeJob(eventId: string) {
+  const token = process.env.HF_TOKEN;
+  if (!token) return Response.json({ error: "HF_TOKEN is missing." }, { status: 503 });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 7000);
+  try {
+    const response = await fetch(`${HF_SPACE}/api/spaces/Lightricks/ltx-video-distilled/gradio_api/call/text_to_video/${encodeURIComponent(eventId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return Response.json({ error: getErrorMessage(data), provider: "huggingface" }, { status: response.status || 502 });
+    }
+
+    const text = await response.text();
+    const events = text.split("\n\n").filter(Boolean);
+    let lastStatus = "processing";
+    for (const event of events) {
+      const lines = event.split("\n");
+      const eventName = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+      const dataLine = lines.find((line) => line.startsWith("data:"));
+      if (!dataLine) continue;
+      const raw = dataLine.slice(5).trim();
+      if (eventName === "error") return Response.json({ status: "error", error: raw || "Free video generation failed.", provider: "huggingface" });
+      if (eventName === "complete") {
+        try {
+          const parsed = JSON.parse(raw);
+          const output = Array.isArray(parsed) ? parsed[0] : parsed;
+          const url = typeof output === "string" ? output : output?.url;
+          return Response.json({ status: "complete", url: url || null, provider: "huggingface" });
+        } catch {
+          return Response.json({ status: "complete", url: null, provider: "huggingface" });
+        }
+      }
+      if (eventName === "status") lastStatus = raw || "processing";
+    }
+    return Response.json({ status: lastStatus === "queued" ? "queued" : "processing", url: null, provider: "huggingface" });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return Response.json({ status: "processing", url: null, provider: "huggingface" });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function GET(request: Request) {
   try {
-    const apiKey = process.env.MAGIC_HOUR_API_KEY;
     const id = new URL(request.url).searchParams.get("id");
+    if (!id) return Response.json({ error: "Missing video job id." }, { status: 400 });
 
-    if (!apiKey) {
-      return Response.json({ error: "KIRAVO is not connected to the video engine yet." }, { status: 500 });
-    }
+    if (id.startsWith("hf:")) return readFreeJob(id.slice(3));
 
-    if (!id) {
-      return Response.json({ error: "Missing video job id." }, { status: 400 });
-    }
+    const apiKey = process.env.MAGIC_HOUR_API_KEY;
+    if (!apiKey) return Response.json({ error: "KIRAVO is not connected to a video engine." }, { status: 503 });
 
     const response = await fetch(`${MAGIC_HOUR_API}/v1/video-projects/${encodeURIComponent(id)}`, {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}` },
       cache: "no-store",
     });
-
     const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      const message = typeof data?.message === "string" ? data.message : "Could not check the video render.";
-      return Response.json({ error: message }, { status: response.status || 502 });
-    }
+    if (!response.ok) return Response.json({ error: getErrorMessage(data), provider: "magichour" }, { status: response.status || 502 });
 
     const status = data?.status;
     const url = Array.isArray(data?.downloads) ? data.downloads[0]?.url : undefined;
-
-    return Response.json({
-      id: data?.id || id,
-      status,
-      url: status === "complete" ? url || null : null,
-      error: status === "error" ? getErrorMessage(data?.error) : null,
-    });
+    return Response.json({ id: data?.id || id, status, url: status === "complete" ? url || null : null, error: status === "error" ? getErrorMessage(data?.error) : null, provider: "magichour" });
   } catch (error) {
     console.error("KIRAVO status error:", error);
-    const message = error instanceof Error ? error.message : "Could not check video status.";
-    return Response.json({ error: message }, { status: 500 });
+    return Response.json({ error: error instanceof Error ? error.message : "Could not check video status." }, { status: 500 });
   }
 }
