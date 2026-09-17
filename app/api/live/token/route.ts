@@ -11,7 +11,7 @@ export async function POST() {
     }
 
     const now = Date.now();
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/auth_tokens", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1alpha/auth_tokens", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -21,6 +21,14 @@ export async function POST() {
         uses: 1,
         expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
         newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
+        liveConnectConstraints: {
+          model: `models/${MODEL}`,
+          config: {
+            responseModalities: ["AUDIO"],
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+          },
+        },
       }),
     });
 
