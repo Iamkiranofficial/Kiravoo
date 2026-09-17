@@ -1,5 +1,5 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
-const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
+const HF_SPACE = "https://lightricks-ltx-2-3.hf.space";
 
 function getErrorMessage(value: unknown) {
   if (typeof value === "string" && value.trim()) return value;
@@ -11,13 +11,28 @@ function getErrorMessage(value: unknown) {
   return "Video generation failed.";
 }
 
+function extractVideoUrl(value: unknown): string | null {
+  if (typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://"))) return value;
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  for (const key of ["url", "video", "path"]) {
+    const candidate = item[key];
+    if (typeof candidate === "string" && (candidate.startsWith("http://") || candidate.startsWith("https://"))) return candidate;
+  }
+  if (item.data) return extractVideoUrl(item.data);
+  return null;
+}
+
 async function readFreeJob(eventId: string) {
+  const token = process.env.HF_TOKEN;
+  if (!token) return Response.json({ error: "HF_TOKEN is not configured.", provider: "huggingface" }, { status: 503 });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7000);
   try {
-    const response = await fetch(`${HF_SPACE}/gradio_api/call/text_to_video/${encodeURIComponent(eventId)}`, {
+    const response = await fetch(`${HF_SPACE}/gradio_api/call/generate_video/${encodeURIComponent(eventId)}`, {
       cache: "no-store",
       signal: controller.signal,
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) {
       const text = await response.text().catch(() => "");
@@ -36,20 +51,21 @@ async function readFreeJob(eventId: string) {
       if (eventName === "complete") {
         try {
           const parsed = JSON.parse(raw);
-          const output = Array.isArray(parsed) ? parsed[0] : parsed;
-          const url = typeof output === "string" ? output : output?.url;
-          return Response.json({ status: "complete", url: url || null, provider: "huggingface" });
+          const url = extractVideoUrl(parsed);
+          return Response.json({ status: "complete", url, provider: "huggingface" });
         } catch {
           return Response.json({ status: "complete", url: null, provider: "huggingface" });
         }
       }
       if (eventName === "status") lastStatus = raw || "processing";
     }
-    return Response.json({ status: lastStatus === "queued" ? "queued" : "processing", url: null, provider: "huggingface" });
+    return Response.json({ status: lastStatus.includes("queue") ? "queued" : "processing", url: null, provider: "huggingface" });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") return Response.json({ status: "processing", url: null, provider: "huggingface" });
     throw error;
-  } finally { clearTimeout(timeout); }
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function GET(request: Request) {
