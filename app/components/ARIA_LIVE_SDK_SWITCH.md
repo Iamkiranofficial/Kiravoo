@@ -1,0 +1,1 @@
+ARIA Live now uses the official @google/genai Live SDK with an ephemeral token instead of a hand-built browser WebSocket handshake.
