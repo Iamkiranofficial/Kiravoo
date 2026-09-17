@@ -1,1 +1,1 @@
-export { default } from "./AssistantChatAgentFixed";
+export { default } from "./AssistantChatAgentDirect";
