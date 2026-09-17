@@ -20,11 +20,22 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   const { height, width } = dimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
-  const response = await fetch(`${HF_SPACE}/gradio_api/call/generate_video`, {
+
+  // LTX-2.3 currently runs on Gradio 6.x. Its agent/API contract uses the
+  // v2 call route with named parameters, while the result stream is polled
+  // from the standard call route.
+  const response = await fetch(`${HF_SPACE}/gradio_api/call/v2/generate_video`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      data: [null, styledPrompt, actualDuration, false, 42, true, height, width],
+      input_image: null,
+      prompt: styledPrompt,
+      duration: actualDuration,
+      enhance_prompt: false,
+      seed: 42,
+      randomize_seed: true,
+      height,
+      width,
     }),
   });
 
@@ -63,6 +74,8 @@ export async function POST(request: Request) {
     const supportedDurations = model === "wan-2.2" ? wanDurations : ltxDurations;
     if (!supportedDurations.has(duration)) return Response.json({ error: `${model} supports ${model === "wan-2.2" ? "3–8" : "1–8"} seconds on the free engine.` }, { status: 400 });
 
+    // Until a dedicated free Wan endpoint is connected, route both UI models
+    // through the verified free LTX-2.3 engine rather than charging Magic Hour.
     if (process.env.HF_TOKEN) return submitFreeVideo(prompt, aspectRatio, duration, style);
 
     const apiKey = process.env.MAGIC_HOUR_API_KEY;
