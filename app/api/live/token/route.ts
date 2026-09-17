@@ -11,7 +11,7 @@ export async function POST() {
     }
 
     const now = Date.now();
-    const response = await fetch("https://generativelanguage.googleapis.com/v1alpha/auth_tokens", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/auth_tokens", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
