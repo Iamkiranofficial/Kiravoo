@@ -1,8 +1,5 @@
-import { Client } from "@gradio/client";
-
 const MAGIC_HOUR_API = "https://api.magichour.ai";
 const HF_SPACE = "https://lightricks-ltx-2-3.hf.space";
-const HF_SPACE_ID = "Lightricks/LTX-2-3";
 
 const allowedModels = new Set(["ltx-2.3", "wan-2.2"]);
 const allowedRatios = new Set(["16:9", "9:16", "1:1"]);
@@ -16,6 +13,28 @@ function dimensions(aspectRatio: string) {
   return { height: 1024, width: 1536 };
 }
 
+async function submitGradio(token: string, endpoint: string, data: unknown[]) {
+  const response = await fetch(`${HF_SPACE}/gradio_api/call/${endpoint}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ data }),
+    cache: "no-store",
+  });
+  const text = await response.text();
+  let payload: any = {};
+  try { payload = text ? JSON.parse(text) : {}; } catch {}
+  if (!response.ok) {
+    const message = typeof payload?.error === "string" ? payload.error : text || `Hugging Face returned HTTP ${response.status}.`;
+    throw Object.assign(new Error(message), { status: response.status });
+  }
+  if (!payload?.event_id) throw new Error("Hugging Face accepted the request but returned no event ID.");
+  return String(payload.event_id);
+}
+
 async function submitFreeVideo(prompt: string, aspectRatio: string, duration: number, style: string) {
   const token = process.env.HF_TOKEN;
   if (!token) return Response.json({ error: "HF_TOKEN is not configured.", provider: "huggingface" }, { status: 503 });
@@ -23,25 +42,23 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   const { height, width } = dimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
+  const data = [null, styledPrompt, actualDuration, false, 42, true, height, width];
 
-  // Use Hugging Face's official Gradio JS client. It discovers the live API
-  // endpoint instead of hard-coding a route that can change with Gradio.
-  const app = await Client.connect(HF_SPACE_ID, { token, events: ["status", "data"] });
-  const api = await app.view_api();
-  let endpoint: string | number = "/generate_video";
-
-  if (!api.named_endpoints?.[endpoint]) {
-    const unnamed = Object.keys(api.unnamed_endpoints || {});
-    if (!unnamed.length) throw new Error("LTX-2.3 did not expose a callable generation endpoint.");
-    endpoint = Number(unnamed[0]);
+  // Gradio's documented queued HTTP API returns an event_id immediately.
+  // Prefer the current route and fall back to the versioned route used by
+  // newer Gradio Spaces if the Space exposes it.
+  let endpoint = "generate_video";
+  let eventId: string;
+  try {
+    eventId = await submitGradio(token, endpoint, data);
+  } catch (firstError) {
+    if ((firstError as any)?.status !== 404) throw firstError;
+    endpoint = "v2/generate_video";
+    eventId = await submitGradio(token, endpoint, data);
   }
 
-  const job = app.submit(endpoint, [null, styledPrompt, actualDuration, false, 42, true, height, width]);
-  const eventId = await (job as any).event_id();
-  if (!eventId) throw new Error("Hugging Face did not return a generation event ID.");
-
   return Response.json({
-    id: `hf:${encodeURIComponent(String(endpoint))}:${eventId}`,
+    id: `hf:${encodeURIComponent(endpoint)}:${encodeURIComponent(eventId)}`,
     provider: "huggingface",
     status: "queued",
     duration: actualDuration,
@@ -86,6 +103,7 @@ export async function POST(request: Request) {
     return Response.json({ id: data.id, provider: "magichour", status: "queued", duration, model, aspectRatio, style, audio, creditsCharged: data.credits_charged ?? null });
   } catch (error) {
     console.error("KIRAVO generation error:", error);
-    return Response.json({ error: error instanceof Error ? error.message : "Video generation failed." }, { status: 500 });
+    const status = Number((error as any)?.status);
+    return Response.json({ error: error instanceof Error ? error.message : "Video generation failed." }, { status: status >= 400 && status < 600 ? status : 500 });
   }
 }
