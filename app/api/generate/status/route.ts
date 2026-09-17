@@ -36,20 +36,18 @@ async function readFreeJob(encodedJob: string) {
   const separator = encodedJob.indexOf(":");
   const endpoint = separator >= 0 ? decodeURIComponent(encodedJob.slice(0, separator)) : "generate_video";
   const eventId = separator >= 0 ? decodeURIComponent(encodedJob.slice(separator + 1)) : decodeURIComponent(encodedJob);
+  const endpointPath = String(endpoint).replace(/^\/+/, "").replace(/^v2\//, "");
 
-  // Newer Hugging Face Spaces may require the versioned v2 route for POST,
-  // while the event stream is still polled through the unversioned endpoint.
-  const endpointPath = String(endpoint).replace(/^\/+/, "");
-  const validEndpoint = endpointPath === "generate_video" || endpointPath === "v2/generate_video";
-  if (!validEndpoint) {
+  if (endpointPath !== "generate_video") {
     return Response.json({ error: "Invalid Hugging Face generation endpoint.", provider: "huggingface" }, { status: 400 });
   }
-  const pollEndpoint = endpointPath === "v2/generate_video" ? "generate_video" : endpointPath;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7000);
   try {
-    const response = await fetch(`${HF_SPACE}/gradio_api/call/${pollEndpoint}/${encodeURIComponent(eventId)}`, {
+    // Hugging Face documents POST /call/v2/<endpoint> for newer Gradio Spaces,
+    // while polling uses GET /call/<endpoint>/<event_id>.
+    const response = await fetch(`${HF_SPACE}/gradio_api/call/${endpointPath}/${encodeURIComponent(eventId)}`, {
       cache: "no-store",
       signal: controller.signal,
       headers: { Authorization: `Bearer ${token}` },
