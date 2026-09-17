@@ -11,6 +11,11 @@ export async function POST() {
     }
 
     const now = Date.now();
+    // Keep the ephemeral token intentionally UNCONSTRAINED here.
+    // Some Gemini API deployments reject the optional liveConnectConstraints
+    // field even though it is documented for v1beta. The client still connects
+    // through the required Constrained WebSocket endpoint and sends its setup
+    // configuration after the socket opens.
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/auth_tokens", {
       method: "POST",
       headers: {
@@ -21,14 +26,6 @@ export async function POST() {
         uses: 1,
         expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
         newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
-        liveConnectConstraints: {
-          model: `models/${MODEL}`,
-          config: {
-            responseModalities: ["AUDIO"],
-            inputAudioTranscription: {},
-            outputAudioTranscription: {},
-          },
-        },
       }),
     });
 
