@@ -19,6 +19,12 @@ function extractVideoUrl(value: unknown): string | null {
     const candidate = item[key];
     if (typeof candidate === "string" && (candidate.startsWith("http://") || candidate.startsWith("https://"))) return candidate;
   }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const url = extractVideoUrl(entry);
+      if (url) return url;
+    }
+  }
   if (item.data) return extractVideoUrl(item.data);
   return null;
 }
@@ -31,10 +37,18 @@ async function readFreeJob(encodedJob: string) {
   const endpoint = separator >= 0 ? decodeURIComponent(encodedJob.slice(0, separator)) : "generate_video";
   const eventId = separator >= 0 ? encodedJob.slice(separator + 1) : encodedJob;
 
+  // Gradio's call route uses the endpoint name as a path segment. Do not
+  // percent-encode the leading slash from a named endpoint, otherwise
+  // /generate_video becomes %2Fgenerate_video and Gradio returns 404.
+  const endpointPath = String(endpoint).replace(/^\/+/, "");
+  if (!endpointPath || endpointPath.includes("..") || endpointPath.includes("/")) {
+    return Response.json({ error: "Invalid Hugging Face generation endpoint.", provider: "huggingface" }, { status: 400 });
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7000);
   try {
-    const response = await fetch(`${HF_SPACE}/gradio_api/call/${encodeURIComponent(endpoint)}/${encodeURIComponent(eventId)}`, {
+    const response = await fetch(`${HF_SPACE}/gradio_api/call/${endpointPath}/${encodeURIComponent(eventId)}`, {
       cache: "no-store",
       signal: controller.signal,
       headers: { Authorization: `Bearer ${token}` },
