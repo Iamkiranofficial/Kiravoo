@@ -36,15 +36,21 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
     false,
   ];
 
+  const hfHeaders = {
+    "Content-Type": "application/json",
+    "X-HF-Authorization": `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
+  };
+
   const response = await fetch(`${HF_SPACE}/gradio_api/call/text_to_video`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: hfHeaders,
     body: JSON.stringify({ data: payload }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.event_id) {
-    const message = typeof data?.detail === "string" ? data.detail : "The free Hugging Face video queue could not be started.";
-    return Response.json({ error: message, provider: "huggingface" }, { status: response.status || 502 });
+    const message = typeof data?.detail === "string" ? data.detail : typeof data?.message === "string" ? data.message : `Hugging Face video engine returned HTTP ${response.status}.`;
+    return Response.json({ error: message, provider: "huggingface", httpStatus: response.status }, { status: response.status || 502 });
   }
 
   return Response.json({ id: `hf:${data.event_id}`, provider: "huggingface", status: "queued", duration: actualDuration, model: "ltx-video-distilled", aspectRatio, style, audio: false, creditsCharged: 0 });
