@@ -21,13 +21,10 @@ export async function POST() {
       body: JSON.stringify({
         uses: 1,
         expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
-        newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
-        liveConnectConstraints: {
+        newSessionExpireTime: new Date(now + 5 * 60 * 1000).toISOString(),
+        fieldMask: "model",
+        bidiGenerateContentSetup: {
           model: `models/${MODEL}`,
-          config: {
-            sessionResumption: {},
-            responseModalities: ["AUDIO"],
-          },
         },
       }),
     });
