@@ -23,6 +23,23 @@ const languageMap: Record<string, string> = {
   "日本語": "ja-JP", "한국어": "ko-KR", "中文": "zh-CN", "العربية": "ar-SA",
 };
 
+const createVideoTool = {
+  name: "create_video",
+  description: "Create a KIRAVO AI video from the user's idea. Use this when the user explicitly asks you to create, generate, make, render, or produce a video. Do not call it for questions or brainstorming only.",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      prompt: { type: "STRING", description: "Detailed visual description of the video to create." },
+      model: { type: "STRING", enum: ["ltx-2.3", "wan-2.2"], description: "Video model. Prefer ltx-2.3 unless the user asks for Wan." },
+      aspectRatio: { type: "STRING", enum: ["16:9", "9:16", "1:1"], description: "Video aspect ratio." },
+      style: { type: "STRING", enum: ["Cinematic", "Realistic", "Anime", "Commercial", "Dreamy"], description: "Visual style." },
+      duration: { type: "INTEGER", description: "Duration in seconds. LTX supports 1-30 seconds; Wan supports 3-15 seconds." },
+      audio: { type: "BOOLEAN", description: "Whether to generate audio. Only supported by LTX 2.3." },
+    },
+    required: ["prompt"],
+  },
+};
+
 const downsampleTo16k = (input: Float32Array, inputRate: number) => {
   const outputRate = 16000;
   if (inputRate === outputRate) {
@@ -153,7 +170,7 @@ export default function AssistantChat() {
       assistant === "orion" ? "Be structured, practical, technical and production-minded." :
       assistant === "atlas" ? "Be curious, research-minded, strategic and excellent at world-building." :
       "Focus on pacing, polish, clarity and final-quality execution.";
-    return `${current.name} is KIRAVO's ${current.tag} creative partner. ${personality} You have access to KIRAVO's video, image, voice, writing, design, editing, research and technical capabilities. Never claim that your capabilities are limited by your personality. ${languageInstruction} Keep spoken answers natural and reasonably concise. This is a real-time voice conversation, so do not use long lists unless the user asks.`;
+    return `${current.name} is KIRAVO's ${current.tag} creative partner. ${personality} You operate the KIRAVO creative studio. When the user explicitly asks to create or generate a video, use the create_video tool instead of merely explaining how to do it. Ask a short clarification only when a required creative detail is genuinely ambiguous. ${languageInstruction} Keep spoken answers natural and reasonably concise. This is a real-time voice conversation, so do not use long lists unless the user asks.`;
   };
 
   const addAssistantTranscript = (text: string) => {
@@ -168,6 +185,36 @@ export default function AssistantChat() {
       }
       return [...items, { role: "assistant", content: full }];
     });
+  };
+
+  const executeToolCall = async (call: any) => {
+    if (call?.name !== "create_video") {
+      return { ok: false, error: `Unknown KIRAVO tool: ${call?.name || "unknown"}` };
+    }
+
+    const args = call.args || {};
+    const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
+    if (!prompt) return { ok: false, error: "A video prompt is required." };
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          model: args.model || "ltx-2.3",
+          aspectRatio: args.aspectRatio || "16:9",
+          style: args.style || "Cinematic",
+          duration: Number.isInteger(args.duration) ? args.duration : 5,
+          audio: args.audio === true,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return { ok: false, error: data.error || "KIRAVO could not start the video render." };
+      return { ok: true, message: "Video generation started.", jobId: data.id, status: data.status, settings: data };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : "Video generation failed." };
+    }
   };
 
   const connectLive = async () => {
@@ -186,9 +233,7 @@ export default function AssistantChat() {
     try {
       const tokenResponse = await fetch("/api/live/token", { method: "POST" });
       const tokenData = await tokenResponse.json().catch(() => ({}));
-      if (!tokenResponse.ok || !tokenData.token) {
-        throw new Error(tokenData.error || "Gemini Live is not connected.");
-      }
+      if (!tokenResponse.ok || !tokenData.token) throw new Error(tokenData.error || "Gemini Live is not connected.");
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -205,15 +250,15 @@ export default function AssistantChat() {
       await inputContext.resume();
       await outputContext.resume();
 
-      // Ephemeral Gemini Live tokens connect through the v1beta constrained endpoint.
       const ws = new WebSocket(
         `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(tokenData.token)}`
       );
       socketRef.current = ws;
 
+      let setupComplete = false;
       const connectionTimeout = window.setTimeout(() => {
-        if (ws.readyState !== WebSocket.OPEN) {
-          setVoiceError("Gemini Live is taking too long to connect. Try the microphone again.");
+        if (!setupComplete) {
+          setVoiceError("Gemini Live setup timed out. Try the microphone again.");
           try { ws.close(); } catch {}
         }
       }, 12000);
@@ -229,6 +274,7 @@ export default function AssistantChat() {
             systemInstruction: { parts: [{ text: systemInstruction() }] },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
+            tools: [{ functionDeclarations: [createVideoTool] }],
           },
         }));
       };
@@ -244,9 +290,26 @@ export default function AssistantChat() {
         }
 
         if (response?.setupComplete) {
+          setupComplete = true;
           clearTimeout(connectionTimeout);
           setLive(true);
           setConnecting(false);
+          return;
+        }
+
+        if (response?.toolCall?.functionCalls?.length) {
+          for (const call of response.toolCall.functionCalls) {
+            const result = await executeToolCall(call);
+            ws.send(JSON.stringify({
+              toolResponse: {
+                functionResponses: [{
+                  name: call.name,
+                  id: call.id,
+                  response: { result },
+                }],
+              },
+            }));
+          }
           return;
         }
 
@@ -288,9 +351,7 @@ export default function AssistantChat() {
         socketRef.current = null;
         setLive(false);
         setConnecting(false);
-        if (event.code !== 1000 && event.code !== 1001) {
-          setVoiceError(event.reason || `Gemini Live disconnected (code ${event.code}).`);
-        }
+        if (event.code !== 1000 && event.code !== 1001) setVoiceError(event.reason || `Gemini Live disconnected (code ${event.code}).`);
       };
 
       const source = inputContext.createMediaStreamSource(stream);
@@ -299,11 +360,7 @@ export default function AssistantChat() {
       processor.onaudioprocess = (event) => {
         if (ws.readyState !== WebSocket.OPEN) return;
         const samples = downsampleTo16k(event.inputBuffer.getChannelData(0), inputContext.sampleRate);
-        ws.send(JSON.stringify({
-          realtimeInput: {
-            audio: { data: int16ToBase64(samples), mimeType: "audio/pcm;rate=16000" },
-          },
-        }));
+        ws.send(JSON.stringify({ realtimeInput: { audio: { data: int16ToBase64(samples), mimeType: "audio/pcm;rate=16000" } } }));
       };
 
       const silentGain = inputContext.createGain();
@@ -333,12 +390,7 @@ export default function AssistantChat() {
     setMessages((items) => [...items, { role: "user", content: text }]);
 
     if (live && socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({
-        clientContent: {
-          turns: [{ role: "user", parts: [{ text }] }],
-          turnComplete: true,
-        },
-      }));
+      socketRef.current.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text }] }], turnComplete: true } }));
       return;
     }
 
@@ -393,14 +445,7 @@ export default function AssistantChat() {
       {voiceError && <div className="assistant-voice-error">{voiceError}</div>}
 
       <div className="assistant-chat-input">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); } }}
-          placeholder={live ? `Talk to ${current.name}…` : `Message ${current.name}…`}
-          rows={1}
-          disabled={busy}
-        />
+        <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); } }} placeholder={live ? `Talk to ${current.name}…` : `Message ${current.name}…`} rows={1} disabled={busy} />
         <button className={`mic-button ${live ? "active" : ""}`} onClick={toggleLive} disabled={busy} aria-label={live ? "Stop live conversation" : "Start live conversation"}>{live ? "■" : "🎙"}</button>
         <button onClick={sendText} disabled={!input.trim() || busy}>↑</button>
       </div>
