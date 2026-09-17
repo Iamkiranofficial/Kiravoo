@@ -186,10 +186,26 @@ export default function AssistantChatAgentFixed() {
       await inputCtx.resume();
       await outCtxRef.current.resume();
 
-      // Use Google's official GenAI SDK instead of manually managing the Live WebSocket.
-      // The SDK handles the ephemeral-token Live handshake and setup protocol.
       const ai = new GoogleGenAI({ apiKey: token.token });
       const model = token.model || "gemini-3.8-live";
+      const createVideoDeclaration = ({
+        name: "create_video",
+        description: "Start a KIRAVO text-to-video render when the user asks you to create a video.",
+        behavior: "BLOCKING",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            prompt: { type: "STRING", description: "Detailed visual description of the video." },
+            model: { type: "STRING", enum: ["ltx-2.3", "wan-2.2"] },
+            aspectRatio: { type: "STRING", enum: ["16:9", "9:16", "1:1"] },
+            style: { type: "STRING", enum: ["Cinematic", "Realistic", "Anime", "Commercial", "Dreamy"] },
+            duration: { type: "NUMBER" },
+            audio: { type: "BOOLEAN" }
+          },
+          required: ["prompt"]
+        }
+      } as any);
+
       const session = await ai.live.connect({
         model,
         config: {
@@ -197,23 +213,7 @@ export default function AssistantChatAgentFixed() {
           systemInstruction: { parts: [{ text: instruction() }] },
           inputAudioTranscription: {},
           outputAudioTranscription: {},
-          tools: [{ functionDeclarations: [{
-            name: "create_video",
-            description: "Start a KIRAVO text-to-video render when the user asks you to create a video.",
-            behavior: "BLOCKING",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                prompt: { type: "STRING", description: "Detailed visual description of the video." },
-                model: { type: "STRING", enum: ["ltx-2.3", "wan-2.2"] },
-                aspectRatio: { type: "STRING", enum: ["16:9", "9:16", "1:1"] },
-                style: { type: "STRING", enum: ["Cinematic", "Realistic", "Anime", "Commercial", "Dreamy"] },
-                duration: { type: "NUMBER" },
-                audio: { type: "BOOLEAN" }
-              },
-              required: ["prompt"]
-            }
-          }] }]
+          tools: [{ functionDeclarations: [createVideoDeclaration] }]
         },
         callbacks: {
           onopen: () => {
