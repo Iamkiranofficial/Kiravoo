@@ -1,5 +1,5 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
-const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
+const HF_SPACE = "https://lightricks-ltx-2-3.hf.space";
 
 const allowedModels = new Set(["ltx-2.3", "wan-2.2"]);
 const allowedRatios = new Set(["16:9", "9:16", "1:1"]);
@@ -8,47 +8,43 @@ const ltxDurations = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
 const wanDurations = new Set([3, 4, 5, 6, 7, 8]);
 
 function dimensions(aspectRatio: string) {
-  if (aspectRatio === "9:16") return { height: 768, width: 432 };
-  if (aspectRatio === "1:1") return { height: 640, width: 640 };
-  return { height: 512, width: 704 };
+  if (aspectRatio === "9:16") return { height: 1536, width: 864 };
+  if (aspectRatio === "1:1") return { height: 1024, width: 1024 };
+  return { height: 864, width: 1536 };
 }
 
 async function submitFreeVideo(prompt: string, aspectRatio: string, duration: number, style: string) {
+  const token = process.env.HF_TOKEN;
+  if (!token) return Response.json({ error: "HF_TOKEN is not configured.", provider: "huggingface" }, { status: 503 });
+
   const { height, width } = dimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
-  const actualFrames = Math.max(9, Math.min(257, Math.round(actualDuration * 30 / 8) * 8 + 1));
-  const payload = [
-    styledPrompt,
-    "worst quality, inconsistent motion, blurry, jittery, distorted, watermark",
-    null,
-    null,
-    height,
-    width,
-    "text-to-video",
-    actualDuration,
-    actualFrames,
-    42,
-    true,
-    3,
-    false,
-  ];
-
-  // The LTX Space is public. Do not attach the user's fine-grained token here:
-  // a token scoped for Inference Providers is not required for a public Space and
-  // can cause an authenticated request to be rejected even though the Space is public.
-  const response = await fetch(`${HF_SPACE}/gradio_api/call/text_to_video`, {
+  const response = await fetch(`${HF_SPACE}/gradio_api/call/generate_video`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ data: payload }),
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      data: [null, styledPrompt, actualDuration, false, 42, true, height, width],
+    }),
   });
+
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.event_id) {
-    const message = typeof data?.detail === "string" ? data.detail : typeof data?.message === "string" ? data.message : `Hugging Face video engine returned HTTP ${response.status}.`;
+    const message = typeof data?.detail === "string" ? data.detail : typeof data?.message === "string" ? data.message : `Hugging Face LTX-2.3 returned HTTP ${response.status}.`;
     return Response.json({ error: message, provider: "huggingface", httpStatus: response.status }, { status: response.status || 502 });
   }
 
-  return Response.json({ id: `hf:${data.event_id}`, provider: "huggingface", status: "queued", duration: actualDuration, model: "ltx-video-distilled", aspectRatio, style, audio: false, creditsCharged: 0 });
+  return Response.json({
+    id: `hf:${data.event_id}`,
+    provider: "huggingface",
+    status: "queued",
+    duration: actualDuration,
+    model: "ltx-2.3",
+    aspectRatio,
+    style,
+    audio: true,
+    creditsCharged: 0,
+  });
 }
 
 export async function POST(request: Request) {
