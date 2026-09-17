@@ -8,13 +8,14 @@ const ltxDurations = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
 const wanDurations = new Set([3, 4, 5, 6, 7, 8]);
 
 function dimensions(aspectRatio: string) {
-  if (aspectRatio === "9:16") return { height: 1536, width: 864 };
-  if (aspectRatio === "1:1") return { height: 1024, width: 1024 };
+  if (aspectRatio === "9:16") return { height: 1024, width: 576 };
+  if (aspectRatio === "1:1") return { height: 768, width: 768 };
   return { height: 1024, width: 1536 };
 }
 
-async function submitGradio(token: string, endpoint: string, data: unknown[]) {
-  const response = await fetch(`${HF_SPACE}/gradio_api/call/${endpoint}`, {
+async function submitGradio(token: string, endpoint: string, data: unknown[], useV2: boolean) {
+  const route = useV2 ? `v2/${endpoint.replace(/^v2\//, "")}` : endpoint.replace(/^v2\//, "");
+  const response = await fetch(`${HF_SPACE}/gradio_api/call/${route}`, {
     method: "POST",
     headers: {
       Accept: "application/json",
@@ -29,10 +30,10 @@ async function submitGradio(token: string, endpoint: string, data: unknown[]) {
   try { payload = text ? JSON.parse(text) : {}; } catch {}
   if (!response.ok) {
     const message = typeof payload?.error === "string" ? payload.error : text || `Hugging Face returned HTTP ${response.status}.`;
-    throw Object.assign(new Error(message), { status: response.status });
+    throw Object.assign(new Error(message), { status: response.status, endpoint: route });
   }
   if (!payload?.event_id) throw new Error("Hugging Face accepted the request but returned no event ID.");
-  return String(payload.event_id);
+  return { eventId: String(payload.event_id), endpoint: route };
 }
 
 async function submitFreeVideo(prompt: string, aspectRatio: string, duration: number, style: string) {
@@ -42,23 +43,21 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   const { height, width } = dimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
+  // Current Lightricks/LTX-2-3 exposes generate_video with exactly these eight inputs.
   const data = [null, styledPrompt, actualDuration, false, 42, true, height, width];
 
-  // Gradio's documented queued HTTP API returns an event_id immediately.
-  // Prefer the current route and fall back to the versioned route used by
-  // newer Gradio Spaces if the Space exposes it.
-  let endpoint = "generate_video";
-  let eventId: string;
+  // Current Gradio Spaces use the v2 call route. Keep the legacy route as a fallback
+  // because older Space builds may still expose it.
+  let result: { eventId: string; endpoint: string };
   try {
-    eventId = await submitGradio(token, endpoint, data);
+    result = await submitGradio(token, "generate_video", data, true);
   } catch (firstError) {
     if ((firstError as any)?.status !== 404) throw firstError;
-    endpoint = "v2/generate_video";
-    eventId = await submitGradio(token, endpoint, data);
+    result = await submitGradio(token, "generate_video", data, false);
   }
 
   return Response.json({
-    id: `hf:${encodeURIComponent(endpoint)}:${encodeURIComponent(eventId)}`,
+    id: `hf:${encodeURIComponent(result.endpoint)}:${encodeURIComponent(result.eventId)}`,
     provider: "huggingface",
     status: "queued",
     duration: actualDuration,
