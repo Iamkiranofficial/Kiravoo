@@ -1,5 +1,6 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
-const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
+const HF_SPACE_ID = "Lightricks/ltx-video-distilled";
+const HF_FALLBACK_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
 
 const allowedModels = new Set(["ltx-2.3", "wan-2.2"]);
 const allowedRatios = new Set(["16:9", "9:16", "1:1"]);
@@ -13,13 +14,29 @@ function dimensions(aspectRatio: string) {
   return { height: 512, width: 704 };
 }
 
+async function resolveSpaceHost(token: string) {
+  try {
+    const response = await fetch(`https://huggingface.co/api/spaces/${HF_SPACE_ID}/host`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      if (typeof data?.host === "string" && data.host.startsWith("https://")) return data.host.replace(/\/$/, "");
+    }
+  } catch {}
+  return HF_FALLBACK_SPACE;
+}
+
 async function submitFreeVideo(prompt: string, aspectRatio: string, duration: number, style: string) {
   const token = process.env.HF_TOKEN;
   if (!token) return Response.json({ error: "Free video engine is ready, but KIRAVO needs a free Hugging Face token. Add HF_TOKEN in Vercel Environment Variables.", provider: "huggingface" }, { status: 503 });
 
+  const spaceHost = await resolveSpaceHost(token);
   const { height, width } = dimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
+  const actualFrames = Math.max(9, Math.min(257, Math.round(actualDuration * 30 / 8) * 8 + 1));
   const payload = [
     styledPrompt,
     "worst quality, blurry, jittery, distorted, watermark",
@@ -29,22 +46,16 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
     width,
     "text-to-video",
     actualDuration,
-    Math.max(9, Math.min(257, Math.round(actualDuration * 30 / 8) * 8 + 1)),
+    actualFrames,
     42,
     true,
     3,
     false,
   ];
 
-  const hfHeaders = {
-    "Content-Type": "application/json",
-    "X-HF-Authorization": `Bearer ${token}`,
-    Authorization: `Bearer ${token}`,
-  };
-
-  const response = await fetch(`${HF_SPACE}/gradio_api/call/text_to_video`, {
+  const response = await fetch(`${spaceHost}/gradio_api/call/text_to_video`, {
     method: "POST",
-    headers: hfHeaders,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ data: payload }),
   });
   const data = await response.json().catch(() => ({}));
