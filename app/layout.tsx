@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import AssistantChat from "./components/AssistantChatV2";
+import AssistantChatAgent from "./components/AssistantChatAgent";
 import CreatorNav from "./components/CreatorNav";
 import NavigationBridge from "./components/NavigationBridge";
 
@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}<AssistantChat /><CreatorNav /><NavigationBridge /></body></html>;
+  return <html lang="en"><body>{children}<AssistantChatAgent /><CreatorNav /><NavigationBridge /></body></html>;
 }
