@@ -1,4 +1,4 @@
-const MODEL = process.env.KIRAVO_LIVE_MODEL || "gemini-3.8-live";
+const MODEL = "gemini-3.8-live";
 
 export async function POST() {
   try {
@@ -22,6 +22,12 @@ export async function POST() {
         uses: 1,
         expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
         newSessionExpireTime: new Date(now + 5 * 60 * 1000).toISOString(),
+        liveConnectConstraints: {
+          model: MODEL,
+          config: {
+            responseModalities: ["AUDIO"],
+          },
+        },
       }),
     });
 
