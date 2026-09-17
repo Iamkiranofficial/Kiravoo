@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import AssistantChat from "./components/AssistantChat";
+import AssistantChat from "./components/AssistantChatV2";
 import CreatorNav from "./components/CreatorNav";
 import NavigationBridge from "./components/NavigationBridge";
 
