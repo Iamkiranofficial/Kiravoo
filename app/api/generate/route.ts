@@ -1,5 +1,5 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
-const HF_SPACE = "https://huggingface.co";
+const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
 
 const allowedModels = new Set(["ltx-2.3", "wan-2.2"]);
 const allowedRatios = new Set(["16:9", "9:16", "1:1"]);
@@ -15,14 +15,10 @@ function dimensions(aspectRatio: string) {
 
 async function submitFreeVideo(prompt: string, aspectRatio: string, duration: number, style: string) {
   const token = process.env.HF_TOKEN;
-  if (!token) {
-    return Response.json({
-      error: "Free video engine is ready, but KIRAVO needs a free Hugging Face token. Add HF_TOKEN in Vercel Environment Variables.",
-      provider: "huggingface",
-    }, { status: 503 });
-  }
+  if (!token) return Response.json({ error: "Free video engine is ready, but KIRAVO needs a free Hugging Face token. Add HF_TOKEN in Vercel Environment Variables.", provider: "huggingface" }, { status: 503 });
 
   const { height, width } = dimensions(aspectRatio);
+  const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
   const payload = [
     styledPrompt,
@@ -32,20 +28,17 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
     height,
     width,
     "text-to-video",
-    Math.min(duration, 8),
-    Math.max(9, Math.round(Math.min(duration, 8) * 30 / 8) * 8 + 1),
+    actualDuration,
+    Math.max(9, Math.min(257, Math.round(actualDuration * 30 / 8) * 8 + 1)),
     42,
     true,
     3,
     false,
   ];
 
-  const response = await fetch(`${HF_SPACE}/api/spaces/Lightricks/ltx-video-distilled/gradio_api/call/text_to_video`, {
+  const response = await fetch(`${HF_SPACE}/gradio_api/call/text_to_video`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ data: payload }),
   });
   const data = await response.json().catch(() => ({}));
@@ -54,17 +47,7 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
     return Response.json({ error: message, provider: "huggingface" }, { status: response.status || 502 });
   }
 
-  return Response.json({
-    id: `hf:${data.event_id}`,
-    provider: "huggingface",
-    status: "queued",
-    duration: Math.min(duration, 8),
-    model: "ltx-video-distilled",
-    aspectRatio,
-    style,
-    audio: false,
-    creditsCharged: 0,
-  });
+  return Response.json({ id: `hf:${data.event_id}`, provider: "huggingface", status: "queued", duration: actualDuration, model: "ltx-video-distilled", aspectRatio, style, audio: false, creditsCharged: 0 });
 }
 
 export async function POST(request: Request) {
@@ -81,41 +64,22 @@ export async function POST(request: Request) {
     if (prompt.length > 20000) return Response.json({ error: "Your prompt is too long." }, { status: 400 });
 
     const supportedDurations = model === "wan-2.2" ? wanDurations : ltxDurations;
-    if (!supportedDurations.has(duration)) {
-      return Response.json({ error: `${model} supports ${model === "wan-2.2" ? "3–8" : "1–8"} seconds on the free engine.` }, { status: 400 });
-    }
+    if (!supportedDurations.has(duration)) return Response.json({ error: `${model} supports ${model === "wan-2.2" ? "3–8" : "1–8"} seconds on the free engine.` }, { status: 400 });
 
-    // Free engine is preferred whenever HF_TOKEN is configured. Magic Hour remains available as fallback.
-    if (process.env.HF_TOKEN) {
-      return submitFreeVideo(prompt, aspectRatio, duration, style);
-    }
+    if (process.env.HF_TOKEN) return submitFreeVideo(prompt, aspectRatio, duration, style);
 
     const apiKey = process.env.MAGIC_HOUR_API_KEY;
-    if (!apiKey) {
-      return Response.json({ error: "No video engine is connected. Add a free HF_TOKEN to enable KIRAVO's free video engine." }, { status: 503 });
-    }
+    if (!apiKey) return Response.json({ error: "No video engine is connected. Add a free HF_TOKEN to enable KIRAVO's free video engine." }, { status: 503 });
 
     const audio = model === "ltx-2.3" && body?.audio === true;
     const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
     const response = await fetch(`${MAGIC_HOUR_API}/v1/text-to-video`, {
       method: "POST",
       headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: `KIRAVO — ${new Date().toISOString()}`,
-        end_seconds: duration,
-        orientation: aspectRatio === "9:16" ? "portrait" : "landscape",
-        aspect_ratio: aspectRatio,
-        resolution: "480p",
-        model,
-        audio,
-        style: { prompt: styledPrompt },
-      }),
+      body: JSON.stringify({ name: `KIRAVO — ${new Date().toISOString()}`, end_seconds: duration, orientation: aspectRatio === "9:16" ? "portrait" : "landscape", aspect_ratio: aspectRatio, resolution: "480p", model, audio, style: { prompt: styledPrompt } }),
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.id) {
-      const message = typeof data?.message === "string" ? data.message : "Magic Hour could not start the video render.";
-      return Response.json({ error: message }, { status: response.status || 502 });
-    }
+    if (!response.ok || !data.id) return Response.json({ error: typeof data?.message === "string" ? data.message : "Magic Hour could not start the video render." }, { status: response.status || 502 });
     return Response.json({ id: data.id, provider: "magichour", status: "queued", duration, model, aspectRatio, style, audio, creditsCharged: data.credits_charged ?? null });
   } catch (error) {
     console.error("KIRAVO generation error:", error);
