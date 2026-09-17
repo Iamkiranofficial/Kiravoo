@@ -23,7 +23,7 @@ export async function POST() {
         expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
         newSessionExpireTime: new Date(now + 5 * 60 * 1000).toISOString(),
         liveConnectConstraints: {
-          model: MODEL,
+          model: `models/${MODEL}`,
           config: {
             responseModalities: ["AUDIO"],
           },
