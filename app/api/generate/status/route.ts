@@ -35,13 +35,13 @@ async function readFreeJob(encodedJob: string) {
 
   const separator = encodedJob.indexOf(":");
   const endpoint = separator >= 0 ? decodeURIComponent(encodedJob.slice(0, separator)) : "generate_video";
-  const eventId = separator >= 0 ? encodedJob.slice(separator + 1) : encodedJob;
+  const eventId = separator >= 0 ? decodeURIComponent(encodedJob.slice(separator + 1)) : decodeURIComponent(encodedJob);
 
-  // Gradio's call route uses the endpoint name as a path segment. Do not
-  // percent-encode the leading slash from a named endpoint, otherwise
-  // /generate_video becomes %2Fgenerate_video and Gradio returns 404.
+  // Accept both the normal Gradio route and the versioned route used by
+  // newer Spaces. Keep the endpoint path explicit so we never encode its '/'.
   const endpointPath = String(endpoint).replace(/^\/+/, "");
-  if (!endpointPath || endpointPath.includes("..") || endpointPath.includes("/")) {
+  const validEndpoint = endpointPath === "generate_video" || endpointPath === "v2/generate_video";
+  if (!validEndpoint) {
     return Response.json({ error: "Invalid Hugging Face generation endpoint.", provider: "huggingface" }, { status: 400 });
   }
 
