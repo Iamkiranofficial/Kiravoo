@@ -19,11 +19,16 @@ async function readFreeJob(eventId: string) {
   const timeout = setTimeout(() => controller.abort(), 7000);
   try {
     const response = await fetch(`${HF_SPACE}/gradio_api/call/text_to_video/${encodeURIComponent(eventId)}`, {
-      headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: controller.signal,
+      headers: {
+        "X-HF-Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+      signal: controller.signal,
     });
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      return Response.json({ error: getErrorMessage(data), provider: "huggingface" }, { status: response.status || 502 });
+      const text = await response.text().catch(() => "");
+      return Response.json({ error: text || `Hugging Face status returned HTTP ${response.status}.`, provider: "huggingface", httpStatus: response.status }, { status: response.status || 502 });
     }
     const text = await response.text();
     const events = text.split("\n\n").filter(Boolean);
