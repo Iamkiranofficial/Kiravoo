@@ -1,5 +1,6 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
 const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
+const HF_LTX23_SPACE = "https://lightricks-ltx-2-3.hf.space";
 
 function parseSseError(raw: string) {
   if (!raw || raw === "null") return "Hugging Face rejected the generation job. The Space returned an empty error.";
@@ -19,7 +20,7 @@ function getErrorMessage(value: unknown) {
 
 function extractVideoUrl(value: unknown): string | null {
   if (typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://"))) return value;
-  if (typeof value === "string" && value.trim()) return HF_SPACE + "/gradio_api/file=" + encodeURIComponent(value);
+  if (typeof value === "string" && value.trim()) return space + "/gradio_api/file=" + encodeURIComponent(value);
   if (!value || typeof value !== "object") return null;
   const item = value as Record<string, unknown>;
   for (const key of ["url", "video", "path"]) {
@@ -37,16 +38,16 @@ function extractVideoUrl(value: unknown): string | null {
   return null;
 }
 
-async function readFreeJob(encodedJob: string) {
+async function readFreeJob(encodedJob: string, space: string, expectedEndpoint: string) {
   const token = process.env.HF_TOKEN;
   if (!token) return Response.json({ error: "HF_TOKEN is not configured.", provider: "huggingface" }, { status: 503 });
 
   const separator = encodedJob.indexOf(":");
-  const endpoint = separator >= 0 ? decodeURIComponent(encodedJob.slice(0, separator)) : "text_to_video";
+  const endpoint = separator >= 0 ? decodeURIComponent(encodedJob.slice(0, separator)) : expectedEndpoint;
   const eventId = separator >= 0 ? decodeURIComponent(encodedJob.slice(separator + 1)) : decodeURIComponent(encodedJob);
   const endpointPath = String(endpoint).replace(/^\/+/, "").replace(/^v2\//, "");
 
-  if (endpointPath !== "text_to_video") {
+  if (endpointPath !== expectedEndpoint) {
     return Response.json({ error: "Invalid Hugging Face generation endpoint.", provider: "huggingface" }, { status: 400 });
   }
 
@@ -55,7 +56,7 @@ async function readFreeJob(encodedJob: string) {
   try {
     // Hugging Face documents POST /call/v2/<endpoint> for newer Gradio Spaces,
     // while polling uses GET /call/<endpoint>/<event_id>.
-    const response = await fetch(`${HF_SPACE}/gradio_api/call/${endpointPath}/${encodeURIComponent(eventId)}`, {
+    const response = await fetch(`${space}/gradio_api/call/${endpointPath}/${encodeURIComponent(eventId)}`, {
       cache: "no-store",
       signal: controller.signal,
       headers: { Authorization: `Bearer ${token}` },
@@ -99,7 +100,8 @@ export async function GET(request: Request) {
   try {
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return Response.json({ error: "Missing video job id." }, { status: 400 });
-    if (id.startsWith("hf:")) return readFreeJob(id.slice(3));
+    if (id.startsWith("hf23:")) return readFreeJob(id.slice(5), HF_LTX23_SPACE, "generate_video");
+    if (id.startsWith("hf:")) return readFreeJob(id.slice(3), HF_SPACE, "text_to_video");
 
     const apiKey = process.env.MAGIC_HOUR_API_KEY;
     if (!apiKey) return Response.json({ error: "KIRAVO is not connected to a video engine." }, { status: 503 });
