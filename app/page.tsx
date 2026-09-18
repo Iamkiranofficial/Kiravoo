@@ -99,8 +99,12 @@ export default function Home() {
     const value = prompt.trim(); if (!value || status === "generating") return;
     setStatus("generating"); setError(""); setVideoUrl(""); setCreditLabel("Auto"); setStage(`${assistant.name} is directing your render…`);
     try {
-      const response = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: value, model, aspectRatio, style, duration, audio, assistant: assistant.id, language }) });
-      const data = await response.json(); if (!response.ok || !data.id) throw new Error(data.error || "KIRAVO could not start the video.");
+      const response = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: value, model, aspectRatio, style, duration, audio, assistant: assistant.id, language }), cache: "no-store" });
+      const raw = await response.text();
+      let data: any = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`KIRAVO server returned invalid JSON (HTTP ${response.status}).`); }
+      if (!response.ok || !data.id) throw new Error(data.error || "KIRAVO could not start the video.");
+      setCreditLabel(data.creditsCharged === 0 ? "Free" : typeof data.creditsCharged === "number" ? `${data.creditsCharged} credits` : "Auto");
       await waitForVideo(data.id);
     } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); setStatus("error"); }
   }
