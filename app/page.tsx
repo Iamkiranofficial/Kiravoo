@@ -37,7 +37,8 @@ export default function Home() {
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [style, setStyle] = useState("Cinematic");
   const [duration, setDuration] = useState(1);
-  const [audio, setAudio] = useState(false);\n  const [creditLabel, setCreditLabel] = useState("Auto");
+  const [audio, setAudio] = useState(false);
+  const [creditLabel, setCreditLabel] = useState("Auto");
   const [history, setHistory] = useState<Project[]>([]);
   const [scenes, setScenes] = useState<string[]>([]);
   const [mediaMode, setMediaMode] = useState<"image" | "voice">("image");
