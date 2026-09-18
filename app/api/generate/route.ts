@@ -72,16 +72,18 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   const data = [null, styledPrompt, actualDuration, true, 42, true, height, width];
 
   let result: { eventId: string; endpoint: string };
+  let jobPrefix = "hf23";
   try {
     result = await submitGradio(token, HF_LTX23_SPACE, "generate_video", data);
   } catch {
     // Keep the older LTX Video Fast Space as a compatibility fallback.
     const legacyData = [styledPrompt, "worst quality, inconsistent motion, blurry, jittery, distorted", null, null, height, width, "text-to-video", actualDuration, 9, 42, true, 3, false];
     result = await submitGradio(token, HF_SPACE, "text_to_video", legacyData);
+    jobPrefix = "hf";
   }
 
   return Response.json({
-    id: `hf23:${encodeURIComponent(result.endpoint)}:${encodeURIComponent(result.eventId)}`,
+    id: `${jobPrefix}:${encodeURIComponent(result.endpoint)}:${encodeURIComponent(result.eventId)}`,
     provider: "huggingface",
     status: "queued",
     duration: actualDuration,
