@@ -8,9 +8,11 @@ const ltxDurations = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
 const wanDurations = new Set([3, 4, 5, 6, 7, 8]);
 
 function dimensions(aspectRatio: string) {
-  if (aspectRatio === "9:16") return { height: 1024, width: 576 };
+  // Lightricks' current Space caps dimensions at 1280px and requires multiples of 32.
+  // Keep the requested aspect ratio while staying inside that limit.
+  if (aspectRatio === "9:16") return { height: 1280, width: 720 };
   if (aspectRatio === "1:1") return { height: 768, width: 768 };
-  return { height: 1024, width: 1536 };
+  return { height: 720, width: 1280 };
 }
 
 async function submitGradio(token: string, endpoint: string, data: unknown[]) {
@@ -72,7 +74,7 @@ export async function POST(request: Request) {
     const supportedDurations = model === "wan-2.2" ? wanDurations : ltxDurations;
     if (!supportedDurations.has(duration)) return Response.json({ error: `${model} supports ${model === "wan-2.2" ? "3–8" : "1–8"} seconds on the free engine.` }, { status: 400 });
 
-    if (process.env.HF_TOKEN) return submitFreeVideo(prompt, aspectRatio, duration, style);
+    if (process.env.HF_TOKEN && model === "ltx-2.3") return submitFreeVideo(prompt, aspectRatio, duration, style);
 
     const apiKey = process.env.MAGIC_HOUR_API_KEY;
     if (!apiKey) return Response.json({ error: "No video engine is connected. Add HF_TOKEN to enable KIRAVO's free video engine." }, { status: 503 });
