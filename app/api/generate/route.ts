@@ -1,5 +1,5 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
-const HF_SPACE = "https://lightricks-ltx-2-3.hf.space";
+const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
 
 const allowedModels = new Set(["ltx-2.3", "wan-2.2"]);
 const allowedRatios = new Set(["16:9", "9:16", "1:1"]);
@@ -13,15 +13,10 @@ function dimensions(aspectRatio: string) {
   return { height: 1024, width: 1536 };
 }
 
-async function submitGradio(token: string, endpoint: string, data: unknown[], useV2: boolean) {
-  const route = useV2 ? `v2/${endpoint.replace(/^v2\//, "")}` : endpoint.replace(/^v2\//, "");
-  const response = await fetch(`${HF_SPACE}/gradio_api/call/${route}`, {
+async function submitGradio(token: string, endpoint: string, data: unknown[]) {
+  const response = await fetch(`${HF_SPACE}/gradio_api/call/v2/${endpoint}`, {
     method: "POST",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ data }),
     cache: "no-store",
   });
@@ -30,10 +25,10 @@ async function submitGradio(token: string, endpoint: string, data: unknown[], us
   try { payload = text ? JSON.parse(text) : {}; } catch {}
   if (!response.ok) {
     const message = typeof payload?.error === "string" ? payload.error : text || `Hugging Face returned HTTP ${response.status}.`;
-    throw Object.assign(new Error(message), { status: response.status, endpoint: route });
+    throw Object.assign(new Error(message), { status: response.status, endpoint });
   }
   if (!payload?.event_id) throw new Error("Hugging Face accepted the request but returned no event ID.");
-  return { eventId: String(payload.event_id), endpoint: route };
+  return { eventId: String(payload.event_id), endpoint };
 }
 
 async function submitFreeVideo(prompt: string, aspectRatio: string, duration: number, style: string) {
@@ -43,18 +38,10 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   const { height, width } = dimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
-  // Current Lightricks/LTX-2-3 exposes generate_video with exactly these eight inputs.
-  const data = [null, styledPrompt, actualDuration, false, 42, true, height, width];
+  // Lightricks LTX Video Fast exposes the stable text_to_video endpoint.
+  const data = [styledPrompt, "worst quality, inconsistent motion, blurry, jittery, distorted", null, null, height, width, "text-to-video", actualDuration, 9, 42, true, 3, false];
 
-  // Current Gradio Spaces use the v2 call route. Keep the legacy route as a fallback
-  // because older Space builds may still expose it.
-  let result: { eventId: string; endpoint: string };
-  try {
-    result = await submitGradio(token, "generate_video", data, true);
-  } catch (firstError) {
-    if ((firstError as any)?.status !== 404) throw firstError;
-    result = await submitGradio(token, "generate_video", data, false);
-  }
+  const result = await submitGradio(token, "text_to_video", data);
 
   return Response.json({
     id: `hf:${encodeURIComponent(result.endpoint)}:${encodeURIComponent(result.eventId)}`,
@@ -64,7 +51,7 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
     model: "ltx-2.3",
     aspectRatio,
     style,
-    audio: true,
+    audio: false,
     creditsCharged: 0,
   });
 }
