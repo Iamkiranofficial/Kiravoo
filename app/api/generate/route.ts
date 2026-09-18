@@ -1,5 +1,6 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
 const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
+const HF_LTX23_SPACE = "https://lightricks-ltx-2-3.hf.space";
 
 const allowedModels = new Set(["ltx-2.3", "wan-2.2"]);
 const allowedRatios = new Set(["16:9", "9:16", "1:1"]);
@@ -15,12 +16,12 @@ function dimensions(aspectRatio: string) {
   return { height: 432, width: 768 };
 }
 
-async function submitGradio(token: string, endpoint: string, data: unknown[]) {
+async function submitGradio(token: string, baseUrl: string, endpoint: string, data: unknown[]) {
   // The Lightricks Space is running Gradio 5.42 and its source defines
   // text_to_video as a positional input list. Use the native Gradio call API.
   const attempts = [
-    { url: `${HF_SPACE}/gradio_api/call/${endpoint}`, body: { data } },
-    { url: `${HF_SPACE}/gradio_api/call/v2/${endpoint}`, body: Object.fromEntries([
+    { url: `${baseUrl}/gradio_api/call/${endpoint}`, body: { data } },
+    { url: `${baseUrl}/gradio_api/call/v2/${endpoint}`, body: Object.fromEntries([
       ["t2v_prompt", data[0]],
       ["negative_prompt_input", data[1]],
       ["image_n_hidden", data[2]],
@@ -67,21 +68,29 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   const { height, width } = dimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
-  // Lightricks LTX Video Fast exposes the stable text_to_video endpoint.
-  const data = [styledPrompt, "worst quality, inconsistent motion, blurry, jittery, distorted", null, null, height, width, "text-to-video", actualDuration, 9, 42, true, 3, false];
+  // Use Lightricks' current LTX-2.3 distilled Space.
+  const data = [null, styledPrompt, actualDuration, true, 42, true, height, width];
 
-  const result = await submitGradio(token, "text_to_video", data);
+  let result: { eventId: string; endpoint: string };
+  try {
+    result = await submitGradio(token, HF_LTX23_SPACE, "generate_video", data);
+  } catch {
+    // Keep the older LTX Video Fast Space as a compatibility fallback.
+    const legacyData = [styledPrompt, "worst quality, inconsistent motion, blurry, jittery, distorted", null, null, height, width, "text-to-video", actualDuration, 9, 42, true, 3, false];
+    result = await submitGradio(token, HF_SPACE, "text_to_video", legacyData);
+  }
 
   return Response.json({
-    id: `hf:${encodeURIComponent(result.endpoint)}:${encodeURIComponent(result.eventId)}`,
+    id: `hf23:${encodeURIComponent(result.endpoint)}:${encodeURIComponent(result.eventId)}`,
     provider: "huggingface",
     status: "queued",
     duration: actualDuration,
     model: "ltx-2.3",
     aspectRatio,
     style,
-    audio: false,
+    audio: true,
     creditsCharged: 0,
+  });
   });
 }
 
