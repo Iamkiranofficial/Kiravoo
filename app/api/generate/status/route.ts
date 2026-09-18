@@ -1,5 +1,11 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
-const HF_SPACE = "https://lightricks-ltx-2-3.hf.space";
+const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
+
+function parseSseError(raw: string) {
+  if (!raw || raw === "null") return "Hugging Face rejected the generation job. The Space returned an empty error.";
+  try { const parsed = JSON.parse(raw); if (typeof parsed === "string" && parsed.trim()) return parsed; if (parsed && typeof parsed === "object") return parsed.message || parsed.detail || parsed.error || JSON.stringify(parsed); } catch {}
+  return raw;
+}
 
 function getErrorMessage(value: unknown) {
   if (typeof value === "string" && value.trim()) return value;
@@ -34,11 +40,11 @@ async function readFreeJob(encodedJob: string) {
   if (!token) return Response.json({ error: "HF_TOKEN is not configured.", provider: "huggingface" }, { status: 503 });
 
   const separator = encodedJob.indexOf(":");
-  const endpoint = separator >= 0 ? decodeURIComponent(encodedJob.slice(0, separator)) : "generate_video";
+  const endpoint = separator >= 0 ? decodeURIComponent(encodedJob.slice(0, separator)) : "text_to_video";
   const eventId = separator >= 0 ? decodeURIComponent(encodedJob.slice(separator + 1)) : decodeURIComponent(encodedJob);
   const endpointPath = String(endpoint).replace(/^\/+/, "").replace(/^v2\//, "");
 
-  if (endpointPath !== "generate_video") {
+  if (endpointPath !== "text_to_video") {
     return Response.json({ error: "Invalid Hugging Face generation endpoint.", provider: "huggingface" }, { status: 400 });
   }
 
@@ -65,11 +71,12 @@ async function readFreeJob(encodedJob: string) {
       const dataLine = lines.find((line) => line.startsWith("data:"));
       if (!dataLine) continue;
       const raw = dataLine.slice(5).trim();
-      if (eventName === "error") return Response.json({ status: "error", error: raw || "Free video generation failed.", provider: "huggingface" });
+      if (eventName === "error") return Response.json({ status: "error", error: parseSseError(raw), provider: "huggingface" });
       if (eventName === "complete") {
         try {
           const parsed = JSON.parse(raw);
           const url = extractVideoUrl(parsed);
+          if (!url) return Response.json({ status: "error", error: "Hugging Face completed the job but returned no video file.", provider: "huggingface" });
           return Response.json({ status: "complete", url, provider: "huggingface" });
         } catch {
           return Response.json({ status: "complete", url: null, provider: "huggingface" });
