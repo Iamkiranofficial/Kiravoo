@@ -14,6 +14,13 @@ function dimensions(aspectRatio: string) {
   return { height: 432, width: 768 };
 }
 
+function workerDimensions(aspectRatio: string) {
+  // Keep the free T4 render practical while preserving the requested aspect ratio.
+  if (aspectRatio === "9:16") return { height: 640, width: 360 };
+  if (aspectRatio === "1:1") return { height: 512, width: 512 };
+  return { height: 360, width: 640 };
+}
+
 function workerUrl() {
   return (process.env.KIRAVO_WORKER_URL || "").replace(/\/$/, "");
 }
@@ -22,7 +29,7 @@ async function submitKaggleWorker(prompt: string, aspectRatio: string, duration:
   const baseUrl = workerUrl();
   if (!baseUrl) throw new Error("KIRAVO_WORKER_URL is not configured.");
 
-  const { height, width } = dimensions(aspectRatio);
+  const { height, width } = workerDimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
 
@@ -37,11 +44,13 @@ async function submitKaggleWorker(prompt: string, aspectRatio: string, duration:
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({
       prompt: styledPrompt,
-      negative_prompt: "worst quality, inconsistent motion, blurry, jittery, distorted",
-      width: Math.min(width, 512),
-      height: Math.min(height, 320),
+      negative_prompt: "worst quality, low quality, blurry, soft focus, motion blur, jittery, distorted, smeared details, noisy, pixelated",
+      width,
+      height,
       num_frames: numFrames,
-      num_inference_steps: 8,
+      // More denoising steps materially improve detail; the Kaggle worker uses the
+      // base 2B checkpoint, so do not use the 8-step distilled setting here.
+      num_inference_steps: 20,
       seed: Math.floor(Math.random() * 1000000),
     }),
     cache: "no-store",
