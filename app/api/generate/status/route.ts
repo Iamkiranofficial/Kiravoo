@@ -19,11 +19,13 @@ function getErrorMessage(value: unknown) {
 
 function extractVideoUrl(value: unknown): string | null {
   if (typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://"))) return value;
+  if (typeof value === "string" && value.trim()) return HF_SPACE + "/gradio_api/file=" + encodeURIComponent(value);
   if (!value || typeof value !== "object") return null;
   const item = value as Record<string, unknown>;
   for (const key of ["url", "video", "path"]) {
     const candidate = item[key];
     if (typeof candidate === "string" && (candidate.startsWith("http://") || candidate.startsWith("https://"))) return candidate;
+    if (key === "path" && typeof candidate === "string" && candidate.trim()) return HF_SPACE + "/gradio_api/file=" + encodeURIComponent(candidate);
   }
   if (Array.isArray(value)) {
     for (const entry of value) {
