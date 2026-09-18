@@ -8,11 +8,11 @@ const ltxDurations = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
 const wanDurations = new Set([3, 4, 5, 6, 7, 8]);
 
 function dimensions(aspectRatio: string) {
-  // Lightricks' current Space caps dimensions at 1280px and requires multiples of 32.
-  // Keep the requested aspect ratio while staying inside that limit.
-  if (aspectRatio === "9:16") return { height: 1280, width: 720 };
-  if (aspectRatio === "1:1") return { height: 768, width: 768 };
-  return { height: 720, width: 1280 };
+  // Keep the free ZeroGPU render small enough for reliable inference.
+  // The Space supports up to 1280px, but its own UI uses much smaller defaults.
+  if (aspectRatio === "9:16") return { height: 768, width: 432 };
+  if (aspectRatio === "1:1") return { height: 512, width: 512 };
+  return { height: 432, width: 768 };
 }
 
 async function submitGradio(token: string, endpoint: string, data: unknown[]) {
