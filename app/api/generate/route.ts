@@ -28,9 +28,7 @@ async function submitGradio(token: string, baseUrl: string, endpoint: string, da
 
   const raw = await response.text();
   let payload: any = {};
-  try {
-    payload = raw ? JSON.parse(raw) : {};
-  } catch {}
+  try { payload = raw ? JSON.parse(raw) : {}; } catch {}
 
   const eventId = payload?.event_id ?? payload?.eventId;
   if (!response.ok || !eventId) {
@@ -50,9 +48,6 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   const { height, width } = dimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
-
-  // Current Lightricks LTX-2.3 Space input order:
-  // image, prompt, duration, enhance_prompt, seed, randomize_seed, height, width.
   const data = [null, styledPrompt, actualDuration, true, 42, true, height, width];
 
   let eventId: string;
@@ -60,7 +55,7 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
 
   try {
     eventId = await submitGradio(token, HF_LTX23_SPACE, "generate_video", data);
-  } catch (primaryError) {
+  } catch {
     const legacyData = [
       styledPrompt,
       "worst quality, inconsistent motion, blurry, jittery, distorted",
@@ -93,6 +88,62 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   });
 }
 
+async function submitMagicHour(
+  apiKey: string,
+  prompt: string,
+  model: string,
+  aspectRatio: string,
+  duration: number,
+  style: string,
+  audio: boolean
+) {
+  const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
+
+  const response = await fetch(`${MAGIC_HOUR_API}/v1/text-to-video`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: `KIRAVO — ${new Date().toISOString()}`,
+      end_seconds: duration,
+      orientation: aspectRatio === "9:16" ? "portrait" : "landscape",
+      aspect_ratio: aspectRatio,
+      resolution: "480p",
+      model,
+      audio,
+      style: { prompt: styledPrompt },
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.id) {
+    return Response.json(
+      {
+        error: typeof data?.message === "string"
+          ? data.message
+          : "Magic Hour could not start the video render.",
+        provider: "magichour",
+      },
+      { status: response.status || 502 }
+    );
+  }
+
+  return Response.json({
+    id: data.id,
+    provider: "magichour",
+    status: "queued",
+    duration,
+    model,
+    aspectRatio,
+    style,
+    audio,
+    creditsCharged: data.credits_charged ?? null,
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -108,58 +159,33 @@ export async function POST(request: Request) {
 
     const supported = model === "wan-2.2" ? wanDurations : ltxDurations;
     if (!supported.has(duration)) {
-      return Response.json({ error: `${model} supports ${model === "wan-2.2" ? "3–8" : "1–8"} seconds on the free engine.` }, { status: 400 });
+      return Response.json(
+        { error: `${model} supports ${model === "wan-2.2" ? "3–8" : "1–8"} seconds on the video engine.` },
+        { status: 400 }
+      );
     }
 
+    const apiKey = process.env.MAGIC_HOUR_API_KEY;
+
+    // Magic Hour is now the primary engine. This removes Hugging Face
+    // from the normal KIRAVO generation path.
+    if (apiKey) {
+      const audio = model === "ltx-2.3" && body?.audio === true;
+      return submitMagicHour(apiKey, prompt, model, aspectRatio, duration, style, audio);
+    }
+
+    // Keep Hugging Face only as an emergency fallback when Magic Hour
+    // is not configured.
     if (process.env.HF_TOKEN && model === "ltx-2.3") {
       return submitFreeVideo(prompt, aspectRatio, duration, style);
     }
 
-    const apiKey = process.env.MAGIC_HOUR_API_KEY;
-    if (!apiKey) {
-      return Response.json({ error: "No video engine is connected. Add HF_TOKEN to enable KIRAVO's free video engine." }, { status: 503 });
-    }
-
-    const audio = model === "ltx-2.3" && body?.audio === true;
-    const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
-    const response = await fetch(`${MAGIC_HOUR_API}/v1/text-to-video`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    return Response.json(
+      {
+        error: "No video engine is connected. Add MAGIC_HOUR_API_KEY in Vercel to enable KIRAVO video generation.",
       },
-      body: JSON.stringify({
-        name: `KIRAVO — ${new Date().toISOString()}`,
-        end_seconds: duration,
-        orientation: aspectRatio === "9:16" ? "portrait" : "landscape",
-        aspect_ratio: aspectRatio,
-        resolution: "480p",
-        model,
-        audio,
-        style: { prompt: styledPrompt },
-      }),
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.id) {
-      return Response.json(
-        { error: typeof data?.message === "string" ? data.message : "Magic Hour could not start the video render." },
-        { status: response.status || 502 }
-      );
-    }
-
-    return Response.json({
-      id: data.id,
-      provider: "magichour",
-      status: "queued",
-      duration,
-      model,
-      aspectRatio,
-      style,
-      audio,
-      creditsCharged: data.credits_charged ?? null,
-    });
+      { status: 503 }
+    );
   } catch (error) {
     console.error("KIRAVO generation error:", error);
     return Response.json(
