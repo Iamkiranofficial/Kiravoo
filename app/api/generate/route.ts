@@ -1,6 +1,6 @@
 const MAGIC_HOUR_API = "https://api.magichour.ai";
 const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
-const HF_LTX23_SPACE = "https://huggingface.co/spaces/Lightricks/LTX-2-3";
+const HF_LTX23_SPACE = "https://lightricks-ltx-2-3.hf.space";
 
 const allowedModels = new Set(["ltx-2.3", "wan-2.2"]);
 const allowedRatios = new Set(["16:9", "9:16", "1:1"]);
