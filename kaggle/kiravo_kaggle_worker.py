@@ -96,11 +96,16 @@ def worker(job_id, payload):
     try:
         pipe = load_pipeline()
         prompt = str(payload.get("prompt", "")).strip()
-        negative = str(payload.get("negative_prompt", "worst quality, blurry, jittery, distorted"))
-        width = int(payload.get("width", 512))
-        height = int(payload.get("height", 320))
+        negative = str(payload.get(
+            "negative_prompt",
+            "worst quality, low quality, blurry, soft focus, motion blur, jittery, distorted, smeared details, noisy, pixelated",
+        ))
+        width = int(payload.get("width", 640))
+        height = int(payload.get("height", 360))
         frames = int(payload.get("num_frames", 41))
-        steps = int(payload.get("num_inference_steps", 8))
+        # The base 2B checkpoint is not the 8-step distilled variant.
+        # More denoising steps materially improve detail and texture.
+        steps = int(payload.get("num_inference_steps", 20))
         seed = int(payload.get("seed", 42))
 
         # Conservative T4 defaults. Dimensions are rounded down to 32-pixel multiples.
@@ -119,7 +124,7 @@ def worker(job_id, payload):
             height=height,
             num_frames=frames,
             num_inference_steps=steps,
-            guidance_scale=1.0,
+            guidance_scale=3.0,
             decode_timestep=0.05,
             decode_noise_scale=0.025,
             generator=generator,
