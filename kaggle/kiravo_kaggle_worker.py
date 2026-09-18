@@ -186,9 +186,9 @@ def video(job_id):
     return send_file(path, mimetype="video/mp4", as_attachment=False)
 
 
-def start_server():
+def start_server(host="0.0.0.0", port=7860):
     """Start Flask without blocking the notebook cell."""
-    APP.run(host="0.0.0.0", port=7860, threaded=True)
+    APP.run(host=host, port=port, threaded=True)
 
 
 if __name__ == "__main__":
