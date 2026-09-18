@@ -93,7 +93,6 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
     audio: true,
     creditsCharged: 0,
   });
-  });
 }
 
 export async function POST(request: Request) {
