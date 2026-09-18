@@ -186,7 +186,10 @@ def video(job_id):
     return send_file(path, mimetype="video/mp4", as_attachment=False)
 
 
-if __name__ == "__main__":
-    # Keep the server alive in the Kaggle cell. In the notebook, run this file
-    # and then start a Cloudflare quick tunnel to port 7860.
+def start_server():
+    """Start Flask without blocking the notebook cell."""
     APP.run(host="0.0.0.0", port=7860, threaded=True)
+
+
+if __name__ == "__main__":
+    start_server()
