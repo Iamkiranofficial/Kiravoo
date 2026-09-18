@@ -29,6 +29,7 @@ subprocess.run([
 import torch
 from flask import Flask, jsonify, request, send_file
 from diffusers import LTXPipeline, LTXLatentUpsamplePipeline, AutoModel
+from diffusers.pipelines.ltx.modeling_latent_upsampler import LTXLatentUpsamplerModel
 from diffusers.hooks import apply_group_offloading
 from diffusers.utils import export_to_video
 
@@ -91,10 +92,13 @@ def load_pipeline():
     # spatial latent upscaler. This synthesizes detail instead of stretching
     # already-blurry pixels.
     try:
-        UPSAMPLE_PIPE = LTXLatentUpsamplePipeline.from_pretrained(
-            "Lightricks/ltxv-spatial-upscaler-0.9.8",
-            vae=pipe.vae,
+        upsampler = LTXLatentUpsamplerModel.from_pretrained(
+            "a-r-r-o-w/LTX-0.9.8-Latent-Upsampler",
             dtype=torch.bfloat16,
+        )
+        UPSAMPLE_PIPE = LTXLatentUpsamplePipeline(
+            vae=pipe.vae,
+            latent_upsampler=upsampler,
         )
         UPSAMPLE_PIPE.enable_model_cpu_offload(device=cuda)
     except Exception as upscaler_error:
