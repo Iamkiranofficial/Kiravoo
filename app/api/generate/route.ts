@@ -14,36 +14,76 @@ function dimensions(aspectRatio: string) {
   return { height: 432, width: 768 };
 }
 
-async function submitGradio(token: string, baseUrl: string, endpoint: string, data: unknown[]) {
-  const response = await fetch(`${baseUrl}/gradio_api/call/${endpoint}`, {
+function workerUrl() {
+  return (process.env.KIRAVO_WORKER_URL || "").replace(/\/$/, "");
+}
+
+async function submitKaggleWorker(prompt: string, aspectRatio: string, duration: number, style: string) {
+  const baseUrl = workerUrl();
+  if (!baseUrl) throw new Error("KIRAVO_WORKER_URL is not configured.");
+
+  const { height, width } = dimensions(aspectRatio);
+  const actualDuration = Math.min(duration, 8);
+  const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
+  // Conservative defaults for a free Kaggle T4 worker.
+  const numFrames = Math.max(17, Math.min(49, Math.round(actualDuration * 8) + 1));
+
+  const response = await fetch(`${baseUrl}/generate`, {
     method: "POST",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ data }),
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt: styledPrompt,
+      negative_prompt: "worst quality, inconsistent motion, blurry, jittery, distorted",
+      width: Math.min(width, 512),
+      height: Math.min(height, 320),
+      num_frames: numFrames,
+      num_inference_steps: 8,
+      seed: Math.floor(Math.random() * 1000000),
+    }),
     cache: "no-store",
   });
 
   const raw = await response.text();
+  let data: any = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch {}
+  if (!response.ok || !data.id) {
+    throw new Error(data?.error || `KIRAVO GPU worker returned HTTP ${response.status}.`);
+  }
+
+  return Response.json({
+    id: `kg:${data.id}`,
+    provider: "kaggle",
+    status: "queued",
+    duration: actualDuration,
+    model: "ltx-2b",
+    aspectRatio,
+    style,
+    audio: false,
+    creditsCharged: 0,
+  });
+}
+
+async function submitGradio(token: string, baseUrl: string, endpoint: string, data: unknown[]) {
+  const response = await fetch(`${baseUrl}/gradio_api/call/${endpoint}`, {
+    method: "POST",
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ data }),
+    cache: "no-store",
+  });
+  const raw = await response.text();
   let payload: any = {};
   try { payload = raw ? JSON.parse(raw) : {}; } catch {}
-
   const eventId = payload?.event_id ?? payload?.eventId;
   if (!response.ok || !eventId) {
     const detail = typeof payload?.error === "string" ? payload.error : raw || `HTTP ${response.status}`;
     throw new Error(`Hugging Face could not start the job: ${detail.slice(0, 700)}`);
   }
-
   return String(eventId);
 }
 
 async function submitFreeVideo(prompt: string, aspectRatio: string, duration: number, style: string) {
   const token = process.env.HF_TOKEN;
-  if (!token) {
-    return Response.json({ error: "HF_TOKEN is not configured.", provider: "huggingface" }, { status: 503 });
-  }
+  if (!token) return Response.json({ error: "HF_TOKEN is not configured.", provider: "huggingface" }, { status: 503 });
 
   const { height, width } = dimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
@@ -52,25 +92,10 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
 
   let eventId: string;
   let providerSpace = "ltx23";
-
   try {
     eventId = await submitGradio(token, HF_LTX23_SPACE, "generate_video", data);
   } catch {
-    const legacyData = [
-      styledPrompt,
-      "worst quality, inconsistent motion, blurry, jittery, distorted",
-      null,
-      null,
-      height,
-      width,
-      "text-to-video",
-      actualDuration,
-      9,
-      42,
-      true,
-      3,
-      false,
-    ];
+    const legacyData = [styledPrompt, "worst quality, inconsistent motion, blurry, jittery, distorted", null, null, height, width, "text-to-video", actualDuration, 9, 42, true, 3, false];
     eventId = await submitGradio(token, HF_SPACE, "text_to_video", legacyData);
     providerSpace = "ltx";
   }
@@ -88,24 +113,11 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   });
 }
 
-async function submitMagicHour(
-  apiKey: string,
-  prompt: string,
-  model: string,
-  aspectRatio: string,
-  duration: number,
-  style: string,
-  audio: boolean
-) {
+async function submitMagicHour(apiKey: string, prompt: string, model: string, aspectRatio: string, duration: number, style: string, audio: boolean) {
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
-
   const response = await fetch(`${MAGIC_HOUR_API}/v1/text-to-video`, {
     method: "POST",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       name: `KIRAVO — ${new Date().toISOString()}`,
       end_seconds: duration,
@@ -117,31 +129,9 @@ async function submitMagicHour(
       style: { prompt: styledPrompt },
     }),
   });
-
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.id) {
-    return Response.json(
-      {
-        error: typeof data?.message === "string"
-          ? data.message
-          : "Magic Hour could not start the video render.",
-        provider: "magichour",
-      },
-      { status: response.status || 502 }
-    );
-  }
-
-  return Response.json({
-    id: data.id,
-    provider: "magichour",
-    status: "queued",
-    duration,
-    model,
-    aspectRatio,
-    style,
-    audio,
-    creditsCharged: data.credits_charged ?? null,
-  });
+  if (!response.ok || !data.id) return Response.json({ error: typeof data?.message === "string" ? data.message : "Magic Hour could not start the video render.", provider: "magichour" }, { status: response.status || 502 });
+  return Response.json({ id: data.id, provider: "magichour", status: "queued", duration, model, aspectRatio, style, audio, creditsCharged: data.credits_charged ?? null });
 }
 
 export async function POST(request: Request) {
@@ -159,38 +149,27 @@ export async function POST(request: Request) {
 
     const supported = model === "wan-2.2" ? wanDurations : ltxDurations;
     if (!supported.has(duration)) {
-      return Response.json(
-        { error: `${model} supports ${model === "wan-2.2" ? "3–8" : "1–8"} seconds on the video engine.` },
-        { status: 400 }
-      );
+      return Response.json({ error: `${model} supports ${model === "wan-2.2" ? "3–8" : "1–8"} seconds on the video engine.` }, { status: 400 });
+    }
+
+    // Free development worker has priority when connected.
+    if (process.env.KIRAVO_WORKER_URL && model === "ltx-2.3") {
+      return submitKaggleWorker(prompt, aspectRatio, duration, style);
     }
 
     const apiKey = process.env.MAGIC_HOUR_API_KEY;
-
-    // Magic Hour is now the primary engine. This removes Hugging Face
-    // from the normal KIRAVO generation path.
     if (apiKey) {
       const audio = model === "ltx-2.3" && body?.audio === true;
       return submitMagicHour(apiKey, prompt, model, aspectRatio, duration, style, audio);
     }
 
-    // Keep Hugging Face only as an emergency fallback when Magic Hour
-    // is not configured.
     if (process.env.HF_TOKEN && model === "ltx-2.3") {
       return submitFreeVideo(prompt, aspectRatio, duration, style);
     }
 
-    return Response.json(
-      {
-        error: "No video engine is connected. Add MAGIC_HOUR_API_KEY in Vercel to enable KIRAVO video generation.",
-      },
-      { status: 503 }
-    );
+    return Response.json({ error: "No video engine is connected. Connect the free KIRAVO Kaggle worker with KIRAVO_WORKER_URL." }, { status: 503 });
   } catch (error) {
     console.error("KIRAVO generation error:", error);
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Video generation failed." },
-      { status: 500 }
-    );
+    return Response.json({ error: error instanceof Error ? error.message : "Video generation failed." }, { status: 500 });
   }
 }
