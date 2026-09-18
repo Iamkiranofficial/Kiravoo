@@ -15,23 +15,49 @@ function dimensions(aspectRatio: string) {
   return { height: 720, width: 1280 };
 }
 
-async function submitGradio(token: string, endpoint: string, data: Record<string, unknown>) {
-  // Gradio 6 v2 uses named parameters. The current Lightricks Space exposes this API.
-  const response = await fetch(`${HF_SPACE}/gradio_api/call/v2/${endpoint}`, {
-    method: "POST",
-    headers: { Accept: "application/json", Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    cache: "no-store",
-  });
-  const text = await response.text();
-  let payload: any = {};
-  try { payload = text ? JSON.parse(text) : {}; } catch {}
-  if (!response.ok) {
-    const message = typeof payload?.error === "string" ? payload.error : text || `Hugging Face returned HTTP ${response.status}.`;
-    throw Object.assign(new Error(message), { status: response.status, endpoint });
+async function submitGradio(token: string, endpoint: string, data: unknown[]) {
+  // The Lightricks Space is running Gradio 5.42 and its source defines
+  // text_to_video as a positional input list. Use the native Gradio call API.
+  const attempts = [
+    { url: `${HF_SPACE}/gradio_api/call/${endpoint}`, body: { data } },
+    { url: `${HF_SPACE}/gradio_api/call/v2/${endpoint}`, body: Object.fromEntries([
+      ["t2v_prompt", data[0]],
+      ["negative_prompt_input", data[1]],
+      ["image_n_hidden", data[2]],
+      ["video_n_hidden", data[3]],
+      ["height_input", data[4]],
+      ["width_input", data[5]],
+      ["mode", data[6]],
+      ["duration_input", data[7]],
+      ["frames_to_use", data[8]],
+      ["seed_input", data[9]],
+      ["randomize_seed_input", data[10]],
+      ["guidance_scale_input", data[11]],
+      ["improve_texture", data[12]]
+    ]) }
+  ];
+
+  let lastMessage = "";
+  for (const attempt of attempts) {
+    const response = await fetch(attempt.url, {
+      method: "POST",
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(attempt.body),
+      cache: "no-store",
+    });
+    const text = await response.text();
+    let payload: any = {};
+    try { payload = text ? JSON.parse(text) : {}; } catch {}
+
+    const eventId = payload?.event_id ?? payload?.eventId;
+    if (response.ok && eventId) return { eventId: String(eventId), endpoint };
+
+    lastMessage = typeof payload?.error === "string"
+      ? payload.error
+      : text || `HTTP ${response.status}`;
   }
-  if (!payload?.event_id) throw new Error("Hugging Face accepted the request but returned no event ID.");
-  return { eventId: String(payload.event_id), endpoint };
+
+  throw new Error(`Hugging Face could not start the job: ${lastMessage.slice(0, 700)}`);
 }
 
 async function submitFreeVideo(prompt: string, aspectRatio: string, duration: number, style: string) {
@@ -42,21 +68,7 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
   // Lightricks LTX Video Fast exposes the stable text_to_video endpoint.
-  const data = {
-    t2v_prompt: styledPrompt,
-    negative_prompt_input: "worst quality, inconsistent motion, blurry, jittery, distorted",
-    image_n_hidden: null,
-    video_n_hidden: null,
-    height_input: height,
-    width_input: width,
-    mode: "text-to-video",
-    duration_input: actualDuration,
-    frames_to_use: 9,
-    seed_input: 42,
-    randomize_seed_input: true,
-    guidance_scale_input: 3,
-    improve_texture: false
-  };
+  const data = [styledPrompt, "worst quality, inconsistent motion, blurry, jittery, distorted", null, null, height, width, "text-to-video", actualDuration, 9, 42, true, 3, false];
 
   const result = await submitGradio(token, "text_to_video", data);
 
