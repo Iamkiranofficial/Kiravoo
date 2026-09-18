@@ -47,7 +47,7 @@ export default function Home() {
   const [mediaPrompt, setMediaPrompt] = useState("");
   const [mediaDuration, setMediaDuration] = useState(5);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const durations = model === "wan-2.2" ? [3, 4, 5, 6, 7, 8, 9, 10, 15] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30];
+  const durations = model === "wan-2.2" ? [3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7, 8];
 
   useEffect(() => {
     try {
