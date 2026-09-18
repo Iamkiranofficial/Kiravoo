@@ -25,8 +25,12 @@ async function submitKaggleWorker(prompt: string, aspectRatio: string, duration:
   const { height, width } = dimensions(aspectRatio);
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
-  // Conservative defaults for a free Kaggle T4 worker.
-  const numFrames = Math.max(17, Math.min(49, Math.round(actualDuration * 8) + 1));
+
+  // LTX uses a temporal grid of 8k+1 frames. Export is 24fps, so
+  // durationSeconds * 24 is converted to the nearest valid frame count:
+  // 1s=25, 2s=49, 3s=73, 4s=97, etc.
+  const targetFrames = Math.max(1, Math.round(actualDuration * 24));
+  const numFrames = Math.max(17, 8 * Math.round((targetFrames - 1) / 8) + 1);
 
   const response = await fetch(`${baseUrl}/generate`, {
     method: "POST",
