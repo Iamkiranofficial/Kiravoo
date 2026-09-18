@@ -28,7 +28,7 @@ subprocess.run([
 
 import torch
 from flask import Flask, jsonify, request, send_file
-from diffusers import LTXPipeline, AutoModel
+from diffusers import LTXPipeline, LTXLatentUpsamplePipeline, AutoModel
 from diffusers.hooks import apply_group_offloading
 from diffusers.utils import export_to_video
 
@@ -38,10 +38,11 @@ OUT.mkdir(parents=True, exist_ok=True)
 JOBS = {}
 LOCK = threading.Lock()
 PIPE = None
+UPSAMPLE_PIPE = None
 
 
 def load_pipeline():
-    global PIPE
+    global PIPE, UPSAMPLE_PIPE
     if PIPE is not None:
         return PIPE
 
@@ -86,6 +87,20 @@ def load_pipeline():
         offload_type="leaf_level",
     )
 
+    # LTX's official quality workflow is draft generation followed by a 2x
+    # spatial latent upscaler. This synthesizes detail instead of stretching
+    # already-blurry pixels.
+    try:
+        UPSAMPLE_PIPE = LTXLatentUpsamplePipeline.from_pretrained(
+            "Lightricks/ltxv-spatial-upscaler-0.9.8",
+            vae=pipe.vae,
+            dtype=torch.bfloat16,
+        )
+        UPSAMPLE_PIPE.enable_model_cpu_offload(device=cuda)
+    except Exception as upscaler_error:
+        print(f"KIRAVO upscaler unavailable; using base render: {upscaler_error}")
+        UPSAMPLE_PIPE = None
+
     PIPE = pipe
     return PIPE
 
@@ -108,10 +123,18 @@ def worker(job_id, payload):
         steps = int(payload.get("num_inference_steps", 20))
         seed = int(payload.get("seed", 42))
 
-        # Conservative T4 defaults. Dimensions are rounded down to 32-pixel multiples.
+        # Generate a VAE-aligned half-resolution draft, then 2x upscale it.
+        target_width = max(320, width)
+        target_height = max(320, height)
         width = max(320, (width // 32) * 32)
         height = max(320, (height // 32) * 32)
         frames = max(17, frames)
+
+        if width / max(height, 1) > 1.5:
+            draft_width, draft_height = 576, 320
+        else:
+            draft_width = max(320, ((width // 2) // 32) * 32)
+            draft_height = max(320, ((height // 2) // 32) * 32)
 
         with LOCK:
             JOBS[job_id]["status"] = "processing"
@@ -120,16 +143,29 @@ def worker(job_id, payload):
         result = pipe(
             prompt=prompt,
             negative_prompt=negative,
-            width=width,
-            height=height,
+            width=draft_width,
+            height=draft_height,
             num_frames=frames,
             num_inference_steps=steps,
             guidance_scale=3.0,
             decode_timestep=0.05,
             decode_noise_scale=0.025,
             generator=generator,
+            output_type="latent" if UPSAMPLE_PIPE is not None else "pil",
         )
-        frames_out = result.frames[0]
+
+        if UPSAMPLE_PIPE is not None:
+            upscaled = UPSAMPLE_PIPE(
+                latents=result.frames,
+                adain_factor=1.0,
+                tone_map_compression_ratio=0.6,
+                output_type="pil",
+            )
+            frames_out = upscaled.frames[0]
+            frames_out = [frame.resize((target_width, target_height)) for frame in frames_out]
+        else:
+            frames_out = result.frames[0]
+
         output = OUT / f"{job_id}.mp4"
         export_to_video(frames_out, str(output), fps=24)
 
