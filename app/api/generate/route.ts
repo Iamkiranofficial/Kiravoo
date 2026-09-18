@@ -15,11 +15,12 @@ function dimensions(aspectRatio: string) {
   return { height: 720, width: 1280 };
 }
 
-async function submitGradio(token: string, endpoint: string, data: unknown[]) {
+async function submitGradio(token: string, endpoint: string, data: Record<string, unknown>) {
+  // Gradio 6 v2 uses named parameters. The current Lightricks Space exposes this API.
   const response = await fetch(`${HF_SPACE}/gradio_api/call/v2/${endpoint}`, {
     method: "POST",
     headers: { Accept: "application/json", Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ data }),
+    body: JSON.stringify(data),
     cache: "no-store",
   });
   const text = await response.text();
@@ -41,7 +42,21 @@ async function submitFreeVideo(prompt: string, aspectRatio: string, duration: nu
   const actualDuration = Math.min(duration, 8);
   const styledPrompt = style === "Cinematic" ? prompt : `${style} visual style. ${prompt}`;
   // Lightricks LTX Video Fast exposes the stable text_to_video endpoint.
-  const data = [styledPrompt, "worst quality, inconsistent motion, blurry, jittery, distorted", null, null, height, width, "text-to-video", actualDuration, 9, 42, true, 3, false];
+  const data = {
+    t2v_prompt: styledPrompt,
+    negative_prompt_input: "worst quality, inconsistent motion, blurry, jittery, distorted",
+    image_n_hidden: null,
+    video_n_hidden: null,
+    height_input: height,
+    width_input: width,
+    mode: "text-to-video",
+    duration_input: actualDuration,
+    frames_to_use: 9,
+    seed_input: 42,
+    randomize_seed_input: true,
+    guidance_scale_input: 3,
+    improve_texture: false
+  };
 
   const result = await submitGradio(token, "text_to_video", data);
 
