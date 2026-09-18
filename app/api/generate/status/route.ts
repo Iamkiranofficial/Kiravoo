@@ -18,7 +18,7 @@ function getErrorMessage(value: unknown) {
   return "Video generation failed.";
 }
 
-function extractVideoUrl(value: unknown): string | null {
+function extractVideoUrl(value: unknown, space: string): string | null {
   if (typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://"))) return value;
   if (typeof value === "string" && value.trim()) return space + "/gradio_api/file=" + encodeURIComponent(value);
   if (!value || typeof value !== "object") return null;
@@ -26,15 +26,15 @@ function extractVideoUrl(value: unknown): string | null {
   for (const key of ["url", "video", "path"]) {
     const candidate = item[key];
     if (typeof candidate === "string" && (candidate.startsWith("http://") || candidate.startsWith("https://"))) return candidate;
-    if (key === "path" && typeof candidate === "string" && candidate.trim()) return HF_SPACE + "/gradio_api/file=" + encodeURIComponent(candidate);
+    if (key === "path" && typeof candidate === "string" && candidate.trim()) return space + "/gradio_api/file=" + encodeURIComponent(candidate);
   }
   if (Array.isArray(value)) {
     for (const entry of value) {
-      const url = extractVideoUrl(entry);
+      const url = extractVideoUrl(entry, space);
       if (url) return url;
     }
   }
-  if (item.data) return extractVideoUrl(item.data);
+  if (item.data) return extractVideoUrl(item.data, space);
   return null;
 }
 
@@ -78,7 +78,7 @@ async function readFreeJob(encodedJob: string, space: string, expectedEndpoint: 
       if (eventName === "complete") {
         try {
           const parsed = JSON.parse(raw);
-          const url = extractVideoUrl(parsed);
+          const url = extractVideoUrl(parsed, space);
           if (!url) return Response.json({ status: "error", error: "Hugging Face completed the job but returned no video file.", provider: "huggingface" });
           return Response.json({ status: "complete", url, provider: "huggingface" });
         } catch {
