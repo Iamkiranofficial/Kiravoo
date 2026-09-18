@@ -100,8 +100,8 @@ export async function GET(request: Request) {
   try {
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return Response.json({ error: "Missing video job id." }, { status: 400 });
-    if (id.startsWith("hf23:")) return readFreeJob(id.slice(5), HF_LTX23_SPACE, "generate_video");
-    if (id.startsWith("hf:")) return readFreeJob(id.slice(3), HF_SPACE, "text_to_video");
+    if (id.startsWith("hf:ltx23:")) return readFreeJob(id.slice(9), HF_LTX23_SPACE, "generate_video");
+    if (id.startsWith("hf:ltx:")) return readFreeJob(id.slice(7), HF_SPACE, "text_to_video");
 
     const apiKey = process.env.MAGIC_HOUR_API_KEY;
     if (!apiKey) return Response.json({ error: "KIRAVO is not connected to a video engine." }, { status: 503 });
