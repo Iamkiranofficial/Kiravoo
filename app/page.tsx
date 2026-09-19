@@ -320,7 +320,7 @@ export default function Home() {
       <div className="floating-scene" aria-hidden="true"><div className="float-orb orb-one" /><div className="float-orb orb-two" /><div className="float-ring ring-one" /><div className="float-ring ring-two" /><div className="float-slab slab-one"><span>K</span><small>WORLD 01</small></div><div className="float-slab slab-two"><span>✦</span><small>CREATE</small></div></div>
       <aside className={`workspace-sidebar ${sidebarOpen ? "open" : ""}`}><div className="sidebar-brand"><span className="brand-mark">K</span><span>KIRAVO</span></div><div className="sidebar-label">CREATE</div><div className="sidebar-nav">
 {[
-  ["Studio","Video","▣"],["Create","Image","▧"],["Editor","Edit","✎"],["Director","Animate","✧"],["Enhance","Enhance","✦"],["Create","Audio","♫"],["Projects","Assets","□"]
+  ["Studio","Video","▣"],["Create","Image","▧"],["Editor","Edit","✎"],["Director","Animate","✧"],["Enhance","Enhance","✦"],["Create","Audio","♫"],["Projects","Assets","□"],["Dashboard","Dashboard","▤"]
 ].map(([route,label,icon], i) => <button key={label} className={`sidebar-link ${active === route && ((label === "Video" && route === "Studio") || label !== "Video") ? "active" : ""}`} onClick={() => label === "Enhance" ? directPrompt() : navigate(route)}><span>{icon}</span><b>{label}</b>{((label === "Video" && active === "Studio") || (label === "Image" && active === "Create") || (label === "Edit" && active === "Editor") || (label === "Animate" && active === "Director")) && <i />}</button>)}
 </div>
 <div className="sidebar-pro"><div className="sidebar-pro-title">♛ <span>KIRAVO PRO</span></div><p>Higher limits<br/>Faster generation<br/>Exclusive models<br/>Early access</p><button onClick={() => navigate("Settings")}>Upgrade</button></div>
