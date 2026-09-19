@@ -3,3 +3,109 @@
 /* KIRAVO kinetic world layer */
 .shell{background-size:180% 180%;animation:worldDrift 24s ease-in-out infinite alternate}.shell:after{background-size:72px 72px;animation:gridFlight 18s linear infinite}.floating-scene{isolation:isolate}.floating-scene:before,.floating-scene:after{content:"";position:absolute;display:block;pointer-events:none;transform-style:preserve-3d}.floating-scene:before{width:74px;height:74px;top:260px;left:18%;border-radius:18px;background:linear-gradient(135deg,#ffe66d,#ff55c7 45%,#695cff);border:1px solid #fff8;box-shadow:0 25px 55px #000b,inset 8px 8px 20px #fff7,inset -14px -18px 25px #130622,0 0 45px #ff55d966;transform:rotateX(52deg) rotateY(38deg) rotateZ(12deg);animation:cubeFlight 11s ease-in-out infinite}.floating-scene:after{width:54px;height:54px;top:590px;right:20%;border-radius:50%;background:radial-gradient(circle at 28% 22%,#fff,#ffe66d 12%,#ff8b5c 36%,#ff3dc7 65%,#28102f 82%);box-shadow:0 25px 50px #000b,0 0 55px #ff5b8a77,inset -14px -18px 22px #17051d;animation:particleFloat 8s ease-in-out infinite}.orb-one{animation:floatOne 8s ease-in-out infinite,orbTilt 9s ease-in-out infinite alternate}.orb-two{animation:floatTwo 9s ease-in-out infinite,orbTiltTwo 10s ease-in-out infinite alternate}.ring-one{animation:spinOne 17s linear infinite,ringFloat 8s ease-in-out infinite alternate}.ring-two{animation:spinTwo 14s linear infinite,ringFloatTwo 9s ease-in-out infinite alternate}.slab-one{animation:slabOne 10s ease-in-out infinite,slabSpin 13s ease-in-out infinite alternate}.slab-two{animation:slabTwo 11s ease-in-out infinite,slabSpinTwo 12s ease-in-out infinite alternate}@keyframes worldDrift{0%{background-position:0% 0%}50%{background-position:55% 35%}100%{background-position:100% 70%}}@keyframes gridFlight{0%{background-position:0 0}100%{background-position:0 720px}}@keyframes cubeFlight{0%,100%{translate:0 0;rotate:0deg}50%{translate:75px -55px;rotate:28deg}}@keyframes particleFloat{0%,100%{translate:0 0 scale(.9)}50%{translate:-65px 40px scale(1.18)}}@keyframes orbTilt{0%{rotate:0deg}100%{rotate:12deg}}@keyframes orbTiltTwo{0%{rotate:0deg}100%{rotate:-15deg}}@keyframes ringFloat{0%{translate:0 0}100%{translate:-30px -35px}}@keyframes ringFloatTwo{0%{translate:0 0}100%{translate:35px -28px}}@keyframes slabSpin{0%{translate:0 0}100%{translate:38px -25px}}@keyframes slabSpinTwo{0%{translate:0 0}100%{translate:-40px 30px}}
 @media(prefers-reduced-motion:reduce){.shell,.shell:before,.shell:after,.floating-scene:before,.floating-scene:after,.orb-one,.orb-two,.ring-one,.ring-two,.slab-one,.slab-two{animation:none!important}}
+
+
+/* KIRAVO PREMIUM CINEMA SYSTEM v2 */
+:root{
+  --kiravo-ink:#070706;
+  --kiravo-void:#0b0a09;
+  --kiravo-panel:#12100e;
+  --kiravo-panel-2:#181410;
+  --kiravo-gold:#d8b36a;
+  --kiravo-gold-bright:#f1d18a;
+  --kiravo-gold-soft:#9d7a3d;
+  --kiravo-wine:#5b2028;
+  --kiravo-wine-bright:#8b3b43;
+  --kiravo-text:#f7f1e7;
+  --kiravo-muted:#aaa095;
+  --kiravo-line:#d8b36a22;
+}
+body{background:var(--kiravo-ink);color:var(--kiravo-text)}
+.shell{
+  background:
+    radial-gradient(ellipse at 50% -10%,#2a2117 0%,transparent 38%),
+    radial-gradient(ellipse at 12% 30%,#32151b55 0%,transparent 28%),
+    radial-gradient(ellipse at 88% 45%,#6d4a171c 0%,transparent 30%),
+    linear-gradient(180deg,#0c0b09 0%,#070706 55%,#050505 100%);
+}
+.shell:before{
+  background:
+    radial-gradient(circle at 15% 22%,#d8b36a18,transparent 18%),
+    radial-gradient(circle at 84% 18%,#8b3b4320,transparent 18%),
+    radial-gradient(circle at 72% 76%,#d8b36a0f,transparent 22%),
+    radial-gradient(circle at 24% 82%,#5b202812,transparent 20%);
+}
+.shell:after{
+  background-image:linear-gradient(#d8b36a0a 1px,transparent 1px),linear-gradient(90deg,#d8b36a0a 1px,transparent 1px);
+  background-size:84px 84px;
+  mask-image:linear-gradient(to bottom,#000,transparent 72%);
+}
+.nav{border-bottom-color:#d8b36a20}
+.brand-mark{
+  background:linear-gradient(145deg,#f1d18a2b,#5b202814);
+  border-color:#d8b36a55;
+  box-shadow:0 15px 35px #0009,inset 0 1px #fff8,0 0 28px #d8b36a18;
+}
+.ghost,.sidebar-home,.inner-back{
+  background:linear-gradient(145deg,#d8b36a12,#ffffff04);
+  border-color:#d8b36a2a;
+}
+.nav-link-button:hover{color:var(--kiravo-gold-bright)}
+.eyebrow{color:#c9bba8}
+.pulse{background:var(--kiravo-gold);box-shadow:0 0 18px #d8b36a,0 0 34px #d8b36a55}
+.hero h1 em,.section-head h2 em,.video-head h2 em{
+  background:linear-gradient(90deg,#f1d18a,#d8b36a 48%,#8b3b43 92%);
+  filter:drop-shadow(0 15px 30px #d8b36a20);
+}
+.composer,.feature-panel,.video-result,.result-card{
+  background:linear-gradient(145deg,#1a1612ee,#0e0d0bf2);
+  border-color:#d8b36a26;
+  box-shadow:0 55px 110px #000e,inset 0 1px #f1d18a20;
+}
+.composer:before{
+  background:linear-gradient(120deg,#d8b36a66,#8b3b4355,#d8b36a22,#f1d18a55);
+}
+.composer:after{
+  background:linear-gradient(90deg,#8b3b43,#d8b36a,#f1d18a);
+  opacity:.18;
+}
+.controls select,.toggle{
+  background:linear-gradient(145deg,#1d1915,#0e0d0b);
+  border-color:#d8b36a22;
+}
+.controls select:hover,.toggle:hover{border-color:#d8b36a66}
+.toggle.on{border-color:#d8b36a66;box-shadow:0 0 30px #d8b36a18,0 12px 22px #000a,inset 0 1px #fff8}
+.generate,.download{
+  background:linear-gradient(135deg,#f3d894,#d8b36a 48%,#9b5d52);
+  border-color:#f1d18a;
+  color:#160f0b;
+  box-shadow:0 18px 38px #000d,0 0 32px #d8b36a25,inset 0 1px #fff;
+}
+.generate:hover{box-shadow:0 27px 55px #000e,0 0 48px #d8b36a44}
+.chips span,.tool-chip,.history-open,.retry{border-color:#d8b36a20;background:#d8b36a08}
+.ready{color:#e4c77f}
+.result-orb{
+  background:conic-gradient(from 0deg,#5b2028,#d8b36a,#f1d18a,#8b3b43,#5b2028);
+  box-shadow:0 0 45px #d8b36a55,0 15px 30px #000;
+}
+.workspace-sidebar{
+  background:linear-gradient(180deg,#100e0cf5,#080807f5);
+  border-right-color:#d8b36a1c;
+}
+.sidebar-link.active{
+  background:linear-gradient(90deg,#d8b36a12,#ffffff03);
+  border-color:#d8b36a25;
+  box-shadow:inset 2px 0 #d8b36a;
+}
+.sidebar-link.active i,.sidebar-status b{background:#d8b36a;color:#d8b36a;box-shadow:0 0 12px #d8b36a}
+.sidebar-status{border-color:#d8b36a18}
+.assistant-orb,.assistant-avatar{background:radial-gradient(circle at 35% 30%,#fff7df,#d8b36a 44%,#5b2028);box-shadow:0 0 24px #d8b36a35}
+.assistant-card:hover,.assistant-card.selected{border-color:#d8b36a66;background:linear-gradient(145deg,#d8b36a12,#ffffff04)}
+.assistant-gender{color:#d8b36a}
+.feature-panel h2 em{background:linear-gradient(90deg,#f1d18a,#d8b36a,#8b3b43);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cards article,.history-grid article,.project-card{
+  border-color:#d8b36a18;
+  background:linear-gradient(145deg,#181410,#0c0b09);
+}
+.cards article:hover,.history-grid article:hover,.project-card:hover{box-shadow:0 45px 90px #000e,0 0 38px #d8b36a14}
+.cards .icon{background:linear-gradient(145deg,#d8b36a,#8b3b43);color:#17100b}
