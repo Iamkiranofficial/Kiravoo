@@ -204,7 +204,7 @@ export default function Home() {
               <div className="premium-composer-bottom">
                 <label className={`image-add ${sourceImage ? "selected" : ""}`}><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden onChange={(e) => setSourceImage(e.target.files?.[0] || null)} />▧ <span>{sourceImage ? sourceImage.name : "Add Image (Optional)"}</span></label>
                 <span className="prompt-count">{prompt.length}/1000</span>
-                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button>
+                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance prompt</button>
                 <button className="premium-generate" onClick={generate} disabled={!prompt.trim() || status === "generating"}><span>✦</span>{status === "generating" ? "Generating…" : sourceImage ? "Animate image" : "Generate"} <b>→</b></button>
               </div>
             </div>
