@@ -119,7 +119,7 @@ export default function Home() {
 
   async function generate() {
     const value = prompt.trim(); if (!value || status === "generating") return;
-    setStatus("generating"); setError(""); setVideoUrl(""); setCreditLabel("Auto"); setStage(\`\${assistant.name} is directing your render…\`);
+    setStatus("generating"); setError(""); setVideoUrl(""); setCreditLabel("Auto"); setStage(`${assistant.name} is directing your render…`);
     try {
       let response: Response;
       if (sourceImage) {
@@ -137,9 +137,9 @@ export default function Home() {
       }
       const raw = await response.text();
       let data: any = {};
-      try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(\`KIRAVO server returned invalid JSON (HTTP \${response.status}).\`); }
+      try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`KIRAVO server returned invalid JSON (HTTP ${response.status}).`); }
       if (!response.ok || !data.id) throw new Error(data.error || "KIRAVO could not start the video.");
-      setCreditLabel(data.creditsCharged === 0 ? "Free" : typeof data.creditsCharged === "number" ? \`\${data.creditsCharged} credits\` : "Auto");
+      setCreditLabel(data.creditsCharged === 0 ? "Free" : typeof data.creditsCharged === "number" ? `${data.creditsCharged} credits` : "Auto");
       await waitForVideo(data.id, sourceImage ? { prompt: value, duration, model: data.model || model, aspectRatio, style } : undefined);
     } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); setStatus("error"); }
   }
@@ -152,7 +152,7 @@ export default function Home() {
       : promptMode === "product"
         ? " premium commercial film, controlled studio lighting, elegant camera movement, refined materials, photorealistic detail"
         : " cinematic storytelling, atmospheric depth, intentional pacing, natural motion, polished film lighting, high detail";
-    setPrompt(\`\${base.replace(/[. ]+$/, "")},\${suffix}.\`);
+    setPrompt(`${base.replace(/[. ]+$/, "")},${suffix}.`);
   };
   const applySuggestion = (text: string) => setPrompt(text);
   const clearPrompt = () => { setPrompt(""); setSourceImage(null); setStatus("idle"); setError(""); setVideoUrl(""); };
@@ -162,8 +162,8 @@ export default function Home() {
   const remixProject = () => { setStatus("idle"); setError(""); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const shareProject = () => {
     if (!videoUrl) return;
-    const payload = { id: \`share-\${Date.now()}\`, prompt, url: videoUrl, createdAt: new Date().toISOString(), aspectRatio, style, duration, model, name: prompt.slice(0, 42), assistant: assistant.name, language };
-    router.push(\`/share?p=\${btoa(encodeURIComponent(JSON.stringify(payload)))}\`);
+    const payload = { id: `share-${Date.now()}`, prompt, url: videoUrl, createdAt: new Date().toISOString(), aspectRatio, style, duration, model, name: prompt.slice(0, 42), assistant: assistant.name, language };
+    router.push(`/share?p=${btoa(encodeURIComponent(JSON.stringify(payload)))}`);
   }
 
   async function generateMedia() {
@@ -247,7 +247,7 @@ export default function Home() {
             {status === "done" && videoUrl && <div className="video-result premium-result">
   <div className="video-head"><div><span className="eyebrow">YOUR KIRAVO WORLD · {assistant.name}</span><h2>Rendered in <em>motion.</em></h2><p className="result-meta">{model} · {style} · {aspectRatio} · {duration}s · {creditLabel}</p></div><span className="ready">READY</span></div>
   <div className="result-stage"><video src={videoUrl} controls autoPlay playsInline className="generated-video" /></div>
-  <div className="result-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><a className="download" href={videoUrl} download>Download ↓</a><button className="retry" onClick={remixProject}>↻ Remix</button><button className="retry" onClick={()=>router.push(\`/editor?project=\${encodeURIComponent(history[0]?.id || "")}\`)}>✂ Edit</button><button className="retry" onClick={shareProject}>⌁ Share</button><button className="retry" onClick={clearPrompt}>＋ New</button></div>
+  <div className="result-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><a className="download" href={videoUrl} download>Download ↓</a><button className="retry" onClick={remixProject}>↻ Remix</button><button className="retry" onClick={()=>router.push(`/editor?project=${encodeURIComponent(history[0]?.id || "")}`)}>✂ Edit</button><button className="retry" onClick={shareProject}>⌁ Share</button><button className="retry" onClick={clearPrompt}>＋ New</button></div>
   <div className="result-insight"><span>✦ {assistant.name} direction</span><p>{prompt}</p></div>
 </div>}
           </>}
