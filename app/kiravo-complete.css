@@ -118,3 +118,16 @@
 .result-card,.video-result{max-width:1160px}
 @media(max-width:800px){.assistant-bar{align-items:stretch}.language-picker{flex:1}.assistant-trigger{flex:1}.controls{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.assistant-bar{display:grid;grid-template-columns:1fr}.assistant-trigger{width:100%}.language-picker{justify-content:center}}
+
+/* KIRAVO PAGE MOTION TRANSITIONS */
+@supports (view-transition-name: root){
+  :root{view-transition-name:root}
+  ::view-transition-group(root){animation-duration:.58s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+  ::view-transition-old(root){animation:kiravo-page-out .38s cubic-bezier(.4,0,1,1) both}
+  ::view-transition-new(root){animation:kiravo-page-in .58s cubic-bezier(.22,1,.36,1) both}
+}
+@keyframes kiravo-page-out{from{opacity:1;transform:scale(1) translateY(0);filter:blur(0)}to{opacity:0;transform:scale(.985) translateY(-10px);filter:blur(5px)}}
+@keyframes kiravo-page-in{from{opacity:0;transform:scale(1.018) translateY(18px);filter:blur(7px)}to{opacity:1;transform:scale(1) translateY(0);filter:blur(0)}}
+@media(prefers-reduced-motion:reduce){
+  ::view-transition-old(root),::view-transition-new(root){animation:none!important}
+}
