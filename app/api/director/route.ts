@@ -32,10 +32,10 @@ export async function POST(request: Request) {
         "Transform the user’s rough idea into a production-ready video concept.",
         "Do not merely rewrite the sentence. Infer useful visual details without changing the user’s core intent.",
         "Think through subject, environment, action, camera, lighting, composition, continuity, pacing and a clear beginning/middle/end.",
-        "Return ONLY valid JSON with keys: prompt, plan, scenes.",
+        "Return ONLY valid JSON with keys: prompt, plan, worldBible, scenes, scenePrompts, continuity.",
         "prompt must be a single detailed generation prompt.",
         "plan must be one concise sentence explaining the creative direction.",
-        "scenes must be an array of 4 concise scene descriptions.",
+        "scenes must be an array of 4 concise scene descriptions. scenePrompts must be an array of 4 detailed, standalone video-generation prompts, one per scene, each preserving the same characters, wardrobe, environment and visual style. worldBible must be a concise object with character, environment, visualStyle and continuityAnchors. continuity must be a concise list of rules that every scene must follow.",
         "Avoid claims that require external research. Do not invent named real people.",
         "User idea: " + prompt,
         "Assistant: " + String(body?.assistantName || "KIRAVO") + " (" + String(body?.assistantTag || "Creative Director") + ")",
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const cleaned = text.replace(/^\s*```json\s*/i, "").replace(/\s*```\s*$/i, "").trim();
     const data = JSON.parse(cleaned);
     if (!data.prompt || !Array.isArray(data.scenes)) throw new Error("Director returned an incomplete plan.");
-    return NextResponse.json({ prompt: String(data.prompt).slice(0, 6000), plan: String(data.plan || "KIRAVO built a visual plan from your idea."), scenes: data.scenes.slice(0, 6).map((x: unknown) => String(x).slice(0, 500)) });
+    return NextResponse.json({ prompt: String(data.prompt).slice(0, 6000), plan: String(data.plan || "KIRAVO built a visual plan from your idea."), worldBible: data.worldBible && typeof data.worldBible === "object" ? data.worldBible : {}, scenes: data.scenes.slice(0, 6).map((x: unknown) => String(x).slice(0, 500)), scenePrompts: Array.isArray(data.scenePrompts) ? data.scenePrompts.slice(0, 6).map((x: unknown) => String(x).slice(0, 5000)) : [], continuity: Array.isArray(data.continuity) ? data.continuity.slice(0, 10).map((x: unknown) => String(x).slice(0, 500)) : [] });
   } catch (error) {
     console.error("KIRAVO director error:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "AI Director failed." }, { status: 500 });
