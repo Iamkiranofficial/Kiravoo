@@ -5,6 +5,17 @@ import "../assistant-chat.css";
 
 type Message = { role: "user" | "assistant"; content: string };
 type WS = WebSocket;
+type RenderJob = {
+  id: string;
+  prompt: string;
+  status: string;
+  url?: string;
+  error?: string;
+  createdAt: string;
+  model?: string;
+  duration?: number;
+  aspectRatio?: string;
+};
 
 const assistants = [
   { id: "aria", name: "ARIA", tag: "Visionary", orb: "◈" },
@@ -53,6 +64,7 @@ export default function AssistantChatAgentDirect() {
   const [connecting, setConnecting] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState("");
+  const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
 
   const wsRef = useRef<WS | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -70,9 +82,34 @@ export default function AssistantChatAgentDirect() {
     try {
       setAssistant(localStorage.getItem("kiravo-assistant") || "aria");
       setLanguage(localStorage.getItem("kiravo-language") || "Auto-detect");
+      const saved = JSON.parse(localStorage.getItem("kiravo-render-jobs") || "[]");
+      if (Array.isArray(saved)) setRenderJobs(saved);
     } catch {}
     return () => stop();
   }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem("kiravo-render-jobs", JSON.stringify(renderJobs)); } catch {}
+  }, [renderJobs]);
+
+  useEffect(() => {
+    if (!renderJobs.some(job => ["queued", "processing", "generating"].includes(job.status))) return;
+    const timer = window.setInterval(async () => {
+      for (const job of renderJobs) {
+        if (!["queued", "processing", "generating"].includes(job.status)) continue;
+        try {
+          const r = await fetch("/api/generate/status?id=" + encodeURIComponent(job.id), { cache: "no-store" });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) continue;
+          setRenderJobs(current => current.map(item => item.id === job.id
+            ? { ...item, status: d.status || item.status, url: d.url || item.url, error: d.error || item.error }
+            : item
+          ));
+        } catch {}
+      }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [renderJobs]);
 
   function stopAudio() {
     sources.current.forEach(s => { try { s.stop(); } catch {} });
@@ -153,7 +190,17 @@ export default function AssistantChatAgentDirect() {
     const r = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const data = await r.json().catch(() => ({}));
     if (!r.ok || !data.id) throw new Error(data.error || "KIRAVO could not start the render.");
-    return { status: "queued", renderId: data.id, message: "KIRAVO video generation has started." };
+    const job: RenderJob = {
+      id: data.id,
+      prompt: payload.prompt,
+      status: data.status || "queued",
+      createdAt: new Date().toISOString(),
+      model: payload.model,
+      duration: payload.duration,
+      aspectRatio: payload.aspectRatio,
+    };
+    setRenderJobs(items => [job, ...items.filter(item => item.id !== job.id)].slice(0, 20));
+    return { status: "queued", renderId: data.id, message: "Video generation started. The render is now visible in Dashboard.", dashboardUrl: "/dashboard" };
   }
 
   async function handleTool(msg: any, ws: WS) {
@@ -335,6 +382,17 @@ export default function AssistantChatAgentDirect() {
       <div className="assistant-chat-tools"><select value={assistant} onChange={e => { setAssistant(e.target.value); localStorage.setItem("kiravo-assistant", e.target.value); }}><option value="aria">ARIA · Visionary</option><option value="nova">NOVA · Energetic</option><option value="luna">LUNA · Storyteller</option><option value="orion">ORION · Precision</option><option value="atlas">ATLAS · Explorer</option><option value="kael">KAEL · Editor</option></select><select value={language} onChange={e => { setLanguage(e.target.value); localStorage.setItem("kiravo-language", e.target.value); }}>{languages.map(x => <option key={x}>{x}</option>)}</select></div>
       <div className="assistant-chat-messages">{messages.length === 0 && <div className="assistant-chat-welcome"><span>{current.orb}</span><h3>Hey, I’m {current.name}.</h3><p>Tell me what you want to create. I can now operate KIRAVO for you.</p><button className="voice-start" onClick={connect}>🎙 Start voice conversation</button></div>}{messages.map((m,i) => <div key={`${m.role}-${i}`} className={`assistant-message ${m.role}`}>{m.content}</div>)}{busy && <div className="assistant-message assistant typing">Thinking…</div>}</div>
       {error && <div className="assistant-voice-error">{error}</div>}
+      {renderJobs.length > 0 && <div className="assistant-render-panel">
+        <div className="assistant-render-head">
+          <div><span>RENDER QUEUE</span><b>{renderJobs.filter(x => ["queued","processing","generating"].includes(x.status)).length} active</b></div>
+          <a href="/dashboard">Open Dashboard ↗</a>
+        </div>
+        {renderJobs.slice(0, 3).map(job => <article className="assistant-render-card" key={job.id}>
+          <div className="assistant-render-thumb">{job.url ? <video src={job.url} muted playsInline preload="metadata" /> : <span className="render-spinner">◌</span>}</div>
+          <div className="assistant-render-copy"><strong>{job.status === "complete" ? "Render ready" : job.status === "error" ? "Render failed" : "Rendering…"}</strong><p>{job.prompt}</p><small>{job.model || "Video"} · {job.duration || 5}s</small></div>
+          {job.url && <a href={job.url} target="_blank" rel="noreferrer">Open ↗</a>}
+        </article>)}
+      </div>}
       <div className="assistant-chat-input"><textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); } }} placeholder={live ? `Talk to ${current.name}…` : `Message ${current.name}…`} rows={1} disabled={busy}/><button className={`mic-button ${live ? "active" : ""}`} onClick={() => live || connecting ? stop() : connect()} disabled={busy}>{live ? "■" : "🎙"}</button><button onClick={sendText} disabled={!input.trim() || busy}>↑</button></div>
     </section>}
     <button className="assistant-chat-launcher" onClick={() => setOpen(v => !v)}><span>{current.orb}</span><b>{open ? "Close" : "AI"}</b></button>
