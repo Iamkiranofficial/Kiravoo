@@ -79,6 +79,10 @@ function findVideoUrl(value: unknown): string | null {
   for (const key of ["video_url", "videoUrl", "url", "download_url", "downloadUrl", "media_url", "mediaUrl"]) {
     const candidate = item[key];
     if (typeof candidate === "string" && /^https?:\/\//.test(candidate)) return candidate;
+    if (Array.isArray(candidate)) {
+      const found = findVideoUrl(candidate);
+      if (found) return found;
+    }
   }
   for (const key of ["data", "result", "output", "video"]) {
     const found = findVideoUrl(item[key]);
