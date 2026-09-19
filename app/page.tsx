@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import "./motion.module.css";
 import "./kiravo-complete.css";
 
@@ -46,6 +47,11 @@ export default function Home() {
   const [mediaAudio, setMediaAudio] = useState<File | null>(null);
   const [mediaPrompt, setMediaPrompt] = useState("");
   const [mediaDuration, setMediaDuration] = useState(5);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [sourceImage, setSourceImage] = useState<File | null>(null);
+  const [promptMode, setPromptMode] = useState<"story" | "shot" | "product">("story");
+  const [copied, setCopied] = useState(false);
+  const router = useRouter();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const durations = model === "wan-2.2" ? [3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -113,16 +119,51 @@ export default function Home() {
 
   async function generate() {
     const value = prompt.trim(); if (!value || status === "generating") return;
-    setStatus("generating"); setError(""); setVideoUrl(""); setCreditLabel("Auto"); setStage(`${assistant.name} is directing your render…`);
+    setStatus("generating"); setError(""); setVideoUrl(""); setCreditLabel("Auto"); setStage(\`\${assistant.name} is directing your render…\`);
     try {
-      const response = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: value, model, aspectRatio, style, duration, audio, assistant: assistant.id, language }), cache: "no-store" });
+      let response: Response;
+      if (sourceImage) {
+        const form = new FormData();
+        form.append("mode", "image");
+        form.append("image", sourceImage);
+        form.append("prompt", value);
+        form.append("duration", String(duration));
+        form.append("model", model);
+        form.append("assistant", assistant.id);
+        form.append("language", language);
+        response = await fetch("/api/generate/media", { method: "POST", body: form, cache: "no-store" });
+      } else {
+        response = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: value, model, aspectRatio, style, duration, audio, assistant: assistant.id, language }), cache: "no-store" });
+      }
       const raw = await response.text();
       let data: any = {};
-      try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`KIRAVO server returned invalid JSON (HTTP ${response.status}).`); }
+      try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(\`KIRAVO server returned invalid JSON (HTTP \${response.status}).\`); }
       if (!response.ok || !data.id) throw new Error(data.error || "KIRAVO could not start the video.");
-      setCreditLabel(data.creditsCharged === 0 ? "Free" : typeof data.creditsCharged === "number" ? `${data.creditsCharged} credits` : "Auto");
-      await waitForVideo(data.id);
+      setCreditLabel(data.creditsCharged === 0 ? "Free" : typeof data.creditsCharged === "number" ? \`\${data.creditsCharged} credits\` : "Auto");
+      await waitForVideo(data.id, sourceImage ? { prompt: value, duration, model: data.model || model, aspectRatio, style } : undefined);
     } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); setStatus("error"); }
+  }
+
+  const enhancePrompt = () => {
+    const base = prompt.trim();
+    if (!base) return;
+    const suffix = promptMode === "shot"
+      ? " cinematic shot design, deliberate camera movement, foreground depth, realistic lighting, strong composition, natural motion"
+      : promptMode === "product"
+        ? " premium commercial film, controlled studio lighting, elegant camera movement, refined materials, photorealistic detail"
+        : " cinematic storytelling, atmospheric depth, intentional pacing, natural motion, polished film lighting, high detail";
+    setPrompt(\`\${base.replace(/[. ]+$/, "")},\${suffix}.\`);
+  };
+  const applySuggestion = (text: string) => setPrompt(text);
+  const clearPrompt = () => { setPrompt(""); setSourceImage(null); setStatus("idle"); setError(""); setVideoUrl(""); };
+  const copyPrompt = async () => {
+    try { await navigator.clipboard.writeText(prompt); setCopied(true); window.setTimeout(() => setCopied(false), 1400); } catch {}
+  };
+  const remixProject = () => { setStatus("idle"); setError(""); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const shareProject = () => {
+    if (!videoUrl) return;
+    const payload = { id: \`share-\${Date.now()}\`, prompt, url: videoUrl, createdAt: new Date().toISOString(), aspectRatio, style, duration, model, name: prompt.slice(0, 42), assistant: assistant.name, language };
+    router.push(\`/share?p=\${btoa(encodeURIComponent(JSON.stringify(payload)))}\`);
   }
 
   async function generateMedia() {
@@ -160,13 +201,26 @@ export default function Home() {
             <div className="premium-composer">
               <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe your video…" rows={2} disabled={status === "generating"} />
               <div className="premium-composer-bottom">
-                <button className="image-add" type="button">▧ <span>Add Image (Optional)</span></button>
+                <label className={`image-add ${sourceImage ? "selected" : ""}`}><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden onChange={(e) => setSourceImage(e.target.files?.[0] || null)} />▧ <span>{sourceImage ? sourceImage.name : "Add Image (Optional)"}</span></label>
                 <span className="prompt-count">{prompt.length}/1000</span>
-                <button className="tune-button" type="button">☷</button>
-                <button className="premium-generate" onClick={generate} disabled={!prompt.trim() || status === "generating"}><span>✦</span>{status === "generating" ? "Generating…" : "Generate"} <b>→</b></button>
+                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button>
+                <button className="premium-generate" onClick={generate} disabled={!prompt.trim() || status === "generating"}><span>✦</span>{status === "generating" ? "Generating…" : sourceImage ? "Animate image" : "Generate"} <b>→</b></button>
               </div>
             </div>
 
+            {advancedOpen && <div className="studio-control-tray">
+  <div className="studio-tray-head"><div><span className="eyebrow">DIRECTOR CONTROLS</span><h3>Shape the render.</h3></div><button className="tool-chip" onClick={() => setAdvancedOpen(false)}>Done</button></div>
+  <div className="studio-control-grid">
+    <label>Model<select value={model} onChange={(e) => setModel(e.target.value)}>{models.map((m) => <option key={m.id} value={m.id}>{m.label} · {m.note}</option>)}</select></label>
+    <label>Aspect ratio<select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)}>{ratios.map((x) => <option key={x}>{x}</option>)}</select></label>
+    <label>Style<select value={style} onChange={(e) => setStyle(e.target.value)}>{styles.map((x) => <option key={x}>{x}</option>)}</select></label>
+    <label>Duration<select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>{durations.map((x) => <option key={x} value={x}>{x}s</option>)}</select></label>
+    <label>AI partner<select value={assistant.id} onChange={(e) => { const x = assistants.find((a) => a.id === e.target.value); if (x) chooseAssistant(x); }}>{assistants.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.tag}</option>)}</select></label>
+    <label>Language<select value={language} onChange={(e) => chooseLanguage(e.target.value)}>{languages.map((x) => <option key={x}>{x}</option>)}</select></label>
+  </div>
+  <div className="studio-tray-row"><div className="prompt-mode"><span>Prompt mode</span>{[["story","Story"],["shot","Shot"],["product","Product"]].map(([id,label])=><button key={id} className={promptMode===id?"active":""} onClick={()=>setPromptMode(id as typeof promptMode)}>{label}</button>)}</div><button className="enhance-prompt" onClick={enhancePrompt}>✦ Enhance prompt</button><button className="copy-prompt" onClick={copyPrompt}>{copied ? "Copied ✓" : "Copy prompt"}</button><button className={audio ? "audio-toggle on" : "audio-toggle"} onClick={()=>setAudio((x)=>!x)} disabled={model==="wan-2.2"}>Audio {audio ? "On" : "Off"}</button></div>
+  {sourceImage && <div className="reference-pill">▧ Reference image ready · {sourceImage.name}<button onClick={()=>setSourceImage(null)}>Remove</button></div>}
+</div>}
             <section className="models-section">
               <div className="section-heading"><div><h2>Our Models</h2><p>Built for creators. Designed for the extraordinary.</p></div><button onClick={() => navigate("Settings")}>View All Models →</button></div>
               <div className="model-showcase">
@@ -190,7 +244,12 @@ export default function Home() {
             {assistantOpen && <div className="assistant-hub"><div className="assistant-hub-head"><div><span className="eyebrow">KIRAVO AI</span><h2>Choose your <em>partner.</em></h2><p>Every assistant can do everything. You choose the personality.</p></div><button className="tool-chip" onClick={() => setAssistantOpen(false)}>Close</button></div><div className="assistant-grid">{assistants.map((x) => <button key={x.id} className={`assistant-card ${assistant.id === x.id ? "selected" : ""}`} onClick={() => chooseAssistant(x)}><span className="assistant-avatar">{x.orb}</span><div><span className="assistant-gender">{x.gender} · {x.tag}</span><h3>{x.name}</h3><p>{x.description}</p></div>{assistant.id === x.id && <i>✓</i>}</button>)}</div></div>}
             {status === "generating" && <div className="result-card kiravo-loading" aria-live="polite"><div className="kiravo-letter-loader" aria-hidden="true"><span>K</span><span>I</span><span>R</span><span>A</span><span>V</span><span>O</span></div><div className="kiravo-loading-copy"><span className="eyebrow">KIRAVO IS CREATING</span><strong>{stage}</strong><p>Building your cinematic world.</p></div><span className="ready">RENDERING</span></div>}
             {status === "error" && <div className="result-card error-card"><div className="result-orb" /><div><strong>Generation failed.</strong><p>{error}</p></div><button className="retry" onClick={generate}>Retry</button></div>}
-            {status === "done" && videoUrl && <div className="video-result"><div className="video-head"><div><span className="eyebrow">YOUR KIRAVO WORLD · {assistant.name}</span><h2>Rendered in <em>motion.</em></h2></div><span className="ready">READY</span></div><video src={videoUrl} controls autoPlay playsInline className="generated-video" /><div className="video-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><button className="retry" onClick={() => { setStatus("idle"); setVideoUrl(""); }}>Create another</button></div></div>}
+            {status === "done" && videoUrl && <div className="video-result premium-result">
+  <div className="video-head"><div><span className="eyebrow">YOUR KIRAVO WORLD · {assistant.name}</span><h2>Rendered in <em>motion.</em></h2><p className="result-meta">{model} · {style} · {aspectRatio} · {duration}s · {creditLabel}</p></div><span className="ready">READY</span></div>
+  <div className="result-stage"><video src={videoUrl} controls autoPlay playsInline className="generated-video" /></div>
+  <div className="result-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><a className="download" href={videoUrl} download>Download ↓</a><button className="retry" onClick={remixProject}>↻ Remix</button><button className="retry" onClick={()=>router.push(\`/editor?project=\${encodeURIComponent(history[0]?.id || "")}\`)}>✂ Edit</button><button className="retry" onClick={shareProject}>⌁ Share</button><button className="retry" onClick={clearPrompt}>＋ New</button></div>
+  <div className="result-insight"><span>✦ {assistant.name} direction</span><p>{prompt}</p></div>
+</div>}
           </>}
           {active !== "Studio" && <><div className={`page-masthead page-${active.toLowerCase()}`}><div><span className="hero-kicker">KIRAVO CREATIVE WORKSPACE</span><h2>{active === "Create" ? <>Create <em>in motion.</em></> : active === "Director" ? <>Direct the <em>story.</em></> : active === "Projects" ? <>Your <em>worlds.</em></> : active === "Editor" ? <>Craft the <em>final cut.</em></> : active === "History" ? <>Your creative <em>history.</em></> : active === "Settings" ? <>Shape your <em>KIRAVO.</em></> : <>Explore <em>the impossible.</em></>}</h2><p>Premium creative tools, cinematic control and a workspace designed around your ideas.</p></div><div className="masthead-symbol">K</div></div><button className="inner-back" onClick={() => navigate("Studio")}>← Back to Studio</button></>}
           {active === "Create" && <div className="feature-panel"><h2>Create from <em>media.</em></h2><p className="sub">Use a real image-to-video render or combine an image with voice/audio.</p><div className="media-tabs"><button className={mediaMode === "image" ? "active" : ""} onClick={() => setMediaMode("image")}>✦ Image → Video</button><button className={mediaMode === "voice" ? "active" : ""} onClick={() => setMediaMode("voice")}>◉ Voice → Video</button></div><label className="media-upload"><span>{mediaImage ? `✓ ${mediaImage.name}` : "Upload image"}</span><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" onChange={(e) => setMediaImage(e.target.files?.[0] || null)} /></label>{mediaMode === "voice" && <label className="media-upload"><span>{mediaAudio ? `✓ ${mediaAudio.name}` : "Upload voice / audio"}</span><input type="file" accept="audio/mpeg,audio/wav,audio/aac,audio/flac,audio/mp4,audio/x-m4a" onChange={(e) => setMediaAudio(e.target.files?.[0] || null)} /></label>}<textarea value={mediaPrompt} onChange={(e) => setMediaPrompt(e.target.value)} placeholder={mediaMode === "image" ? "Describe the motion…" : "Describe the visual mood and motion…"} /><div className="media-controls"><label>Duration<select value={mediaDuration} onChange={(e) => setMediaDuration(Number(e.target.value))}>{[3,4,5,6,8,10,15].map((x) => <option key={x} value={x}>{x}s</option>)}</select></label><label>Model<select value={model} onChange={(e) => setModel(e.target.value)}>{models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></label></div><button className="generate" onClick={generateMedia} disabled={!mediaImage || status === "generating" || (mediaMode === "voice" && !mediaAudio)}>{status === "generating" ? "Creating…" : mediaMode === "image" ? "Animate image ↗" : "Build voice video ↗"}</button></div>}
