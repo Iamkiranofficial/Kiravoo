@@ -42,6 +42,8 @@ export default function Home() {
   const [creditLabel, setCreditLabel] = useState("Auto");
   const [history, setHistory] = useState<Project[]>([]);
   const [scenes, setScenes] = useState<string[]>([]);
+  const [directorThinking, setDirectorThinking] = useState(false);
+  const [directorPlan, setDirectorPlan] = useState("");
   const [mediaMode, setMediaMode] = useState<"image" | "voice">("image");
   const [mediaImage, setMediaImage] = useState<File | null>(null);
   const [mediaAudio, setMediaAudio] = useState<File | null>(null);
@@ -154,7 +156,22 @@ export default function Home() {
     } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); setStatus("error"); }
   }
 
-  const directPrompt = () => {
+  const directPrompt = async () => {
+    const base = prompt.trim();
+    if (!base || directorThinking) return;
+    setDirectorThinking(true); setError("");
+    try {
+      const response = await fetch("/api/director", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: base, assistant: assistant.id, assistantName: assistant.name, assistantTag: assistant.tag, style, aspectRatio, duration, language }), cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "AI Director could not plan the video.");
+      if (data.prompt) setPrompt(data.prompt);
+      if (Array.isArray(data.scenes)) setScenes(data.scenes);
+      if (data.plan) setDirectorPlan(data.plan);
+    } catch (e) { setError(e instanceof Error ? e.message : "AI Director failed."); }
+    finally { setDirectorThinking(false); }
+  };
+
+  const legacyDirectPrompt = () => {
     const base = prompt.trim();
     if (!base) return;
     const camera = style === "Cinematic" ? "slow controlled dolly or crane movement, motivated camera motion, layered foreground and background depth" : style === "Realistic" ? "natural handheld or stabilized camera movement, physically plausible motion and lighting" : style === "Anime" ? "dynamic anime camera language, expressive framing, clean stylized motion" : style === "Commercial" ? "premium product-film camera movement, precise framing, polished studio or location lighting" : "dreamlike floating camera movement, soft transitions and atmospheric depth";
@@ -253,7 +270,7 @@ export default function Home() {
               <div className="premium-composer-bottom">
                 <label className={`image-add ${sourceImage ? "selected" : ""}`}><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden onChange={(e) => setSourceImage(e.target.files?.[0] || null)} />▧ <span>{sourceImage ? sourceImage.name : "Add Image (Optional)"}</span></label>
                 <span className="prompt-count">{prompt.length}/1000</span>
-                <button className={`voice-create ${listening ? "listening" : ""}`} type="button" onClick={listening ? stopVoiceCreation : startVoiceCreation} disabled={!speechSupported || status === "generating"} title={speechSupported ? "Speak your video idea" : "Speech input is not supported in this browser"}>{listening ? "● Listening…" : "🎙 Speak to KIRAVO"}</button>                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt quick-enhance" type="button" onClick={directPrompt} disabled={!prompt.trim()}>✦ AI Director</button><button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance</button>
+                <button className={`voice-create ${listening ? "listening" : ""}`} type="button" onClick={listening ? stopVoiceCreation : startVoiceCreation} disabled={!speechSupported || status === "generating"} title={speechSupported ? "Speak your video idea" : "Speech input is not supported in this browser"}>{listening ? "● Listening…" : "🎙 Speak to KIRAVO"}</button>                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt quick-enhance" type="button" onClick={directPrompt} disabled={!prompt.trim() || directorThinking}>{directorThinking ? "◌ Thinking…" : "✦ AI Director"}</button><button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance</button>
                 <button className="premium-generate" onClick={generate} disabled={!prompt.trim() || status === "generating"}><span>✦</span>{status === "generating" ? "Generating…" : sourceImage ? "Animate image" : "Generate"} <b>→</b></button>
               </div>
             </div>
@@ -278,10 +295,10 @@ export default function Home() {
     <label>AI partner<select value={assistant.id} onChange={(e) => { const x = assistants.find((a) => a.id === e.target.value); if (x) chooseAssistant(x); }}>{assistants.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.tag}</option>)}</select></label>
     <label>Language<select value={language} onChange={(e) => chooseLanguage(e.target.value)}>{languages.map((x) => <option key={x}>{x}</option>)}</select></label>
   </div>
-  <div className="studio-tray-row"><div className="prompt-mode"><span>Prompt mode</span>{[["story","Story"],["shot","Shot"],["product","Product"]].map(([id,label])=><button key={id} className={promptMode===id?"active":""} onClick={()=>setPromptMode(id as typeof promptMode)}>{label}</button>)}</div><button className="enhance-prompt" onClick={directPrompt}>✦ AI Director pass</button><button className="enhance-prompt" onClick={enhancePrompt}>✦ Enhance prompt</button><button className="copy-prompt" onClick={copyPrompt}>{copied ? "Copied ✓" : "Copy prompt"}</button><button className={audio ? "audio-toggle on" : "audio-toggle"} onClick={()=>setAudio((x)=>!x)} disabled={model==="wan-2.2"}>Audio {audio ? "On" : "Off"}</button></div>
+  <div className="studio-tray-row"><div className="prompt-mode"><span>Prompt mode</span>{[["story","Story"],["shot","Shot"],["product","Product"]].map(([id,label])=><button key={id} className={promptMode===id?"active":""} onClick={()=>setPromptMode(id as typeof promptMode)}>{label}</button>)}</div><button className="enhance-prompt" onClick={directPrompt}>{directorThinking ? "◌ Director thinking…" : "✦ AI Director pass"}</button><button className="enhance-prompt" onClick={enhancePrompt}>✦ Enhance prompt</button><button className="copy-prompt" onClick={copyPrompt}>{copied ? "Copied ✓" : "Copy prompt"}</button><button className={audio ? "audio-toggle on" : "audio-toggle"} onClick={()=>setAudio((x)=>!x)} disabled={model==="wan-2.2"}>Audio {audio ? "On" : "Off"}</button></div>
   {sourceImage && <div className="reference-pill">▧ Reference image ready · {sourceImage.name}<button onClick={()=>setSourceImage(null)}>Remove</button></div>}
 </div>}
-<div className="studio-suggestions"><span>START WITH</span><button onClick={()=>applySuggestion("A cinematic drone shot flying over Hyderabad at sunset, warm haze, slow camera movement, realistic city detail")}>Hyderabad at sunset</button><button onClick={()=>applySuggestion("A luxury fashion film in a rain-soaked neon street, elegant camera movement, glossy reflections")}>Neon fashion</button><button onClick={()=>applySuggestion("A lone astronaut discovers an ancient glowing temple on an alien planet, epic cinematic lighting")}>Alien temple</button><button onClick={()=>applySuggestion("A premium product commercial for a futuristic smartphone, black studio, dramatic rim light")}>Product film</button></div>
+<div className="director-ai-plan" aria-live="polite">{directorPlan && <p>{directorPlan}</p>}{scenes.length > 0 && <div>{scenes.map((scene,i)=><span key={i}>{String(i+1).padStart(2,"0")} · {scene}</span>)}</div>}</div><div className="studio-suggestions"><span>START WITH</span><button onClick={()=>applySuggestion("A cinematic drone shot flying over Hyderabad at sunset, warm haze, slow camera movement, realistic city detail")}>Hyderabad at sunset</button><button onClick={()=>applySuggestion("A luxury fashion film in a rain-soaked neon street, elegant camera movement, glossy reflections")}>Neon fashion</button><button onClick={()=>applySuggestion("A lone astronaut discovers an ancient glowing temple on an alien planet, epic cinematic lighting")}>Alien temple</button><button onClick={()=>applySuggestion("A premium product commercial for a futuristic smartphone, black studio, dramatic rim light")}>Product film</button></div>
             <section className="models-section">
               <div className="section-heading"><div><h2>Our Models</h2><p>Built for creators. Designed for the extraordinary.</p></div><button onClick={() => navigate("Settings")}>View All Models →</button></div>
               <div className="model-showcase">
