@@ -45,3 +45,41 @@
   .showcase-art{height:120px!important}
   .creator-nav{display:none!important}
 }
+
+
+/* FINAL PHOTO VISIBILITY FIX — preserve the supplied reference artwork, hide embedded card copy */
+.kiravo-hero{position:relative!important;overflow:hidden!important}
+.kiravo-hero-figure{
+  z-index:2!important;
+  right:0!important;
+  top:0!important;
+  width:58%!important;
+  height:100%!important;
+  opacity:1!important;
+  background-size:cover!important;
+  background-position:center right!important;
+  background-repeat:no-repeat!important;
+  pointer-events:none!important;
+}
+.kiravo-hero-copy{z-index:4!important}
+.hero-mantra{z-index:4!important}
+.model-card{overflow:hidden!important}
+.model-card:after{
+  z-index:2!important;
+  background:linear-gradient(180deg,rgba(0,0,0,0.02) 0%,rgba(0,0,0,0.10) 28%,rgba(4,4,4,0.92) 63%,rgba(4,4,4,0.99) 100%)!important;
+}
+.model-copy{z-index:4!important}
+.showcase-art{background-image:var(--showcase-ref-image)!important}
+@media(max-width:700px){
+  .kiravo-hero-figure{
+    width:72%!important;
+    height:100%!important;
+    right:-4px!important;
+    top:0!important;
+    background-size:cover!important;
+    background-position:center right!important;
+  }
+  .model-card:after{
+    background:linear-gradient(180deg,rgba(0,0,0,0.03) 0%,rgba(0,0,0,0.12) 30%,rgba(4,4,4,0.96) 60%,rgba(4,4,4,1) 100%)!important;
+  }
+}
