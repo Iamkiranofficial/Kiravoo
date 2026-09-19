@@ -103,7 +103,13 @@ async function readPixazoJob(jobId: string) {
   }
 
   if (rawStatus === "COMPLETED" || rawStatus === "COMPLETE" || rawStatus === "SUCCEEDED" || rawStatus === "SUCCESS") {
-    const url = findVideoUrl(data);
+    const pixazoMediaUrl = data?.output?.media_url;
+    const directUrl = Array.isArray(pixazoMediaUrl)
+      ? pixazoMediaUrl.find((value: unknown) => typeof value === "string" && /^https?:\/\//.test(value))
+      : typeof pixazoMediaUrl === "string" && /^https?:\/\//.test(pixazoMediaUrl)
+        ? pixazoMediaUrl
+        : null;
+    const url = directUrl || findVideoUrl(data);
     if (!url) {
       return Response.json({ status: "error", url: null, error: "Pixazo completed the job but returned no video URL.", provider: "pixazo" });
     }
