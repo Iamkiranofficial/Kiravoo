@@ -55,6 +55,14 @@ export default function Home() {
       const savedAssistant = assistants.find((x) => x.id === localStorage.getItem("kiravo-assistant"));
       if (savedAssistant) setAssistant(savedAssistant);
       setLanguage(localStorage.getItem("kiravo-language") || "Auto-detect");
+      const remixPrompt = localStorage.getItem("kiravo-remix-prompt");
+      const remixStyle = localStorage.getItem("kiravo-remix-style");
+      const remixRatio = localStorage.getItem("kiravo-remix-ratio");
+      const remixDuration = Number(localStorage.getItem("kiravo-remix-duration") || 0);
+      if (remixPrompt) { setPrompt(remixPrompt); localStorage.removeItem("kiravo-remix-prompt"); }
+      if (remixStyle && styles.includes(remixStyle)) { setStyle(remixStyle); localStorage.removeItem("kiravo-remix-style"); }
+      if (remixRatio && ratios.includes(remixRatio)) { setAspectRatio(remixRatio); localStorage.removeItem("kiravo-remix-ratio"); }
+      if (remixDuration >= 1 && remixDuration <= 8) { setDuration(remixDuration); localStorage.removeItem("kiravo-remix-duration"); }
     } catch {}
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, []);
