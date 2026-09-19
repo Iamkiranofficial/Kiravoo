@@ -5,10 +5,10 @@ import { useEffect, useState } from "react";
 
 const items = [
   ["Studio", "/"], ["Create", "/?workspace=create"], ["Director", "/director"],
-  ["Projects", "/projects"], ["Editor", "/editor"], ["History", "/projects?view=history"],
+  ["Dashboard", "/dashboard"], ["Projects", "/projects"], ["Editor", "/editor"], ["History", "/projects?view=history"],
   ["Explore", "/explore"], ["Profile", "/creator"], ["Settings", "/settings"],
 ] as const;
-const icons: Record<string,string> = { Studio:"⌂",Create:"✦",Director:"✧",Projects:"▣",Editor:"◫",History:"◷",Explore:"◇",Profile:"◉",Settings:"⚙" };
+const icons: Record<string,string> = { Studio:"⌂",Create:"✦",Director:"✧",Dashboard:"▤",Projects:"▣",Editor:"◫",History:"◷",Explore:"◇",Profile:"◉",Settings:"⚙" };
 
 export default function CreatorNav(){
  const router=useRouter();
