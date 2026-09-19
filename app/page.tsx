@@ -42,6 +42,8 @@ export default function Home() {
   const [creditLabel, setCreditLabel] = useState("Auto");
   const [history, setHistory] = useState<Project[]>([]);
   const [scenes, setScenes] = useState<string[]>([]);
+  const [directorThinking, setDirectorThinking] = useState(false);
+  const [directorPlan, setDirectorPlan] = useState("");
   const [mediaMode, setMediaMode] = useState<"image" | "voice">("image");
   const [mediaImage, setMediaImage] = useState<File | null>(null);
   const [mediaAudio, setMediaAudio] = useState<File | null>(null);
@@ -145,6 +147,38 @@ export default function Home() {
     } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); setStatus("error"); }
   }
 
+  const directPrompt = async () => {
+    const base = prompt.trim();
+    if (!base || directorThinking) return;
+    setDirectorThinking(true);
+    setError("");
+    try {
+      const response = await fetch("/api/director", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: base,
+          assistantName: assistant.name,
+          assistantTag: assistant.tag,
+          style,
+          aspectRatio,
+          duration,
+          language
+        }),
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "AI Director could not plan the video.");
+      if (data.prompt) setPrompt(String(data.prompt).slice(0, 1000));
+      if (Array.isArray(data.scenes)) setScenes(data.scenes);
+      if (data.plan) setDirectorPlan(String(data.plan));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI Director failed.");
+    } finally {
+      setDirectorThinking(false);
+    }
+  };
+
   const enhancePrompt = () => {
     const base = prompt.trim();
     if (!base) return;
@@ -204,7 +238,7 @@ export default function Home() {
               <div className="premium-composer-bottom">
                 <label className={`image-add ${sourceImage ? "selected" : ""}`}><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden onChange={(e) => setSourceImage(e.target.files?.[0] || null)} />▧ <span>{sourceImage ? sourceImage.name : "Add Image (Optional)"}</span></label>
                 <span className="prompt-count">{prompt.length}/1000</span>
-                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance prompt</button>
+                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt" onClick={directPrompt} disabled={!prompt.trim() || directorThinking}>{directorThinking ? "◌ Director thinking…" : "✦ AI Director"}</button><button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance prompt</button>
                 <button className="premium-generate" onClick={generate} disabled={!prompt.trim() || status === "generating"}><span>✦</span>{status === "generating" ? "Generating…" : sourceImage ? "Animate image" : "Generate"} <b>→</b></button>
               </div>
             </div>
