@@ -122,3 +122,53 @@
  .model-cinema,.model-real,.model-anime,.model-flow{background-size:400% auto!important;background-position-y:58%!important}
  .showcase-art{background-size:400% auto!important;background-position-y:100%!important}
 }
+
+
+/* KIRAVO PHOTO SHEET — FINAL SEPARATE-CROP FIX
+   Each UI slot is clipped to exactly one source photo.
+   The sheet is used only as a sprite; neighboring photos can never bleed into a slot.
+*/
+:root{
+  --kiravo-photo-sheet:url("https://d2ol7oe51mr4n9c93c22.png");
+}
+.kiravo-hero-figure{
+  background-image:url("https://d2ol7oe51mr4n9c93c22.png")!important;
+  background-repeat:no-repeat!important;
+  background-size:133.6% auto!important;
+  background-position:center top!important;
+}
+.model-cinema,.model-real,.model-anime,.model-flow{
+  background-image:url("https://d2ol7oe51mr4n9c93c22.png")!important;
+  background-repeat:no-repeat!important;
+  background-size:400% auto!important;
+  background-position-y:32%!important;
+}
+.model-cinema{background-position-x:0%!important}
+.model-real{background-position-x:33.333333%!important}
+.model-anime{background-position-x:66.666667%!important}
+.model-flow{background-position-x:100%!important}
+.showcase-art{
+  background-image:url("https://d2ol7oe51mr4n9c93c22.png")!important;
+  background-repeat:no-repeat!important;
+  background-size:400% auto!important;
+  background-position-y:68%!important;
+}
+.showcase-art.city{background-position-x:0%!important}
+.showcase-art.mountains{background-position-x:33.333333%!important}
+.showcase-art.lion{background-position-x:66.666667%!important}
+.showcase-art.car{background-position-x:100%!important}
+.model-card:before{display:none!important}
+@media(max-width:700px){
+  .kiravo-hero-figure{
+    background-size:133.6% auto!important;
+    background-position:center top!important;
+  }
+  .model-cinema,.model-real,.model-anime,.model-flow{
+    background-size:400% auto!important;
+    background-position-y:35%!important;
+  }
+  .showcase-art{
+    background-size:400% auto!important;
+    background-position-y:73%!important;
+  }
+}
