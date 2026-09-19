@@ -83,3 +83,42 @@
     background:linear-gradient(180deg,rgba(0,0,0,0.03) 0%,rgba(0,0,0,0.12) 30%,rgba(4,4,4,0.96) 60%,rgba(4,4,4,1) 100%)!important;
   }
 }
+
+
+/* KIRAVO APPROVED PHOTO SHEET — use the exact user-approved photo sheet as the source of truth */
+:root{--kiravo-photo-sheet:url("https://d2ol7oe51mr4n9.cloudfront.net/user_30VOH5bBmIivWBteuzKyt0W9tV6/3da45c22-b440-4e18-9b06-d5e556c93a27.png")}
+.kiravo-hero-figure{
+  background-image:var(--kiravo-photo-sheet)!important;
+  background-repeat:no-repeat!important;
+  background-size:100% auto!important;
+  background-position:center top!important;
+}
+.model-cinema,.model-real,.model-anime,.model-flow{
+  background-image:var(--kiravo-photo-sheet)!important;
+  background-repeat:no-repeat!important;
+  background-size:400% auto!important;
+  background-position-y:58%!important;
+}
+.model-cinema{background-position-x:0%!important}
+.model-real{background-position-x:33.3333%!important}
+.model-anime{background-position-x:66.6667%!important}
+.model-flow{background-position-x:100%!important}
+.showcase-art{
+  background-image:var(--kiravo-photo-sheet)!important;
+  background-repeat:no-repeat!important;
+  background-size:400% auto!important;
+  background-position-y:100%!important;
+}
+.showcase-art.city{background-position-x:0%!important}
+.showcase-art.mountains{background-position-x:33.3333%!important}
+.showcase-art.lion{background-position-x:66.6667%!important}
+.showcase-art.car{background-position-x:100%!important}
+.model-card:before{display:none!important}
+.model-card:after{
+  background:linear-gradient(180deg,rgba(0,0,0,.02) 0%,rgba(0,0,0,.08) 42%,rgba(4,4,4,.96) 100%)!important;
+}
+@media(max-width:700px){
+ .kiravo-hero-figure{background-size:100% auto!important;background-position:center top!important}
+ .model-cinema,.model-real,.model-anime,.model-flow{background-size:400% auto!important;background-position-y:58%!important}
+ .showcase-art{background-size:400% auto!important;background-position-y:100%!important}
+}
