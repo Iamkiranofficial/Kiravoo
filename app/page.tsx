@@ -51,10 +51,19 @@ export default function Home() {
   const [sourceImage, setSourceImage] = useState<File | null>(null);
   const [promptMode, setPromptMode] = useState<"story" | "shot" | "product">("story");
   const [copied, setCopied] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const [lastProjectId, setLastProjectId] = useState("");
   const router = useRouter();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const durations = model === "wan-2.2" ? [3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7, 8];
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setSpeechSupported(Boolean(SpeechRecognition));
+    return () => { try { recognitionRef.current?.stop(); } catch {} };
+  }, []);
 
   useEffect(() => {
     try {
@@ -118,8 +127,8 @@ export default function Home() {
     throw new Error("The render is taking longer than expected. Please try again.");
   }
 
-  async function generate() {
-    const value = prompt.trim(); if (!value || status === "generating") return;
+  async function generate(spokenPrompt?: string) {
+    const value = (spokenPrompt || prompt).trim(); if (!value || status === "generating") return;
     setStatus("generating"); setError(""); setVideoUrl(""); setCreditLabel("Auto"); setStage(`${assistant.name} is directing your render…`);
     try {
       let response: Response;
@@ -161,6 +170,35 @@ export default function Home() {
     try { await navigator.clipboard.writeText(prompt); setCopied(true); window.setTimeout(() => setCopied(false), 1400); } catch {}
   };
   const remixProject = () => { setStatus("idle"); setError(""); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const startVoiceCreation = () => {
+    if (!speechSupported || listening || status === "generating") return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = language === "తెలుగు" ? "te-IN" : language === "हिन्दी" ? "hi-IN" : language === "தமிழ்" ? "ta-IN" : language === "ಕನ್ನಡ" ? "kn-IN" : language === "മലയാളം" ? "ml-IN" : language === "বাংলা" ? "bn-IN" : language === "मराठी" ? "mr-IN" : language === "ગુજરાતી" ? "gu-IN" : language === "ਪੰਜਾਬੀ" ? "pa-IN" : language === "Español" ? "es-ES" : language === "Français" ? "fr-FR" : language === "Deutsch" ? "de-DE" : language === "Português" ? "pt-BR" : language === "日本語" ? "ja-JP" : language === "한국어" ? "ko-KR" : language === "中文" ? "zh-CN" : language === "العربية" ? "ar-SA" : "en-IN";
+    let finalText = "";
+    recognition.onstart = () => { setListening(true); setError(""); };
+    recognition.onresult = (event: any) => {
+      let live = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const text = event.results[i][0]?.transcript || "";
+        if (event.results[i].isFinal) finalText += text + " "; else live += text;
+      }
+      setPrompt((finalText + live).trim());
+    };
+    recognition.onerror = (event: any) => { setListening(false); if (event?.error !== "aborted") setError("Voice input failed: " + (event?.error || "unknown error") + "."); };
+    recognition.onend = () => {
+      setListening(false); recognitionRef.current = null;
+      const spoken = finalText.trim();
+      if (spoken) { setPrompt(spoken); window.setTimeout(() => generate(spoken), 50); }
+    };
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const stopVoiceCreation = () => { try { recognitionRef.current?.stop(); } catch {} };
 
   const shareProject = () => {
     if (!videoUrl) return;
@@ -205,7 +243,7 @@ export default function Home() {
               <div className="premium-composer-bottom">
                 <label className={`image-add ${sourceImage ? "selected" : ""}`}><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden onChange={(e) => setSourceImage(e.target.files?.[0] || null)} />▧ <span>{sourceImage ? sourceImage.name : "Add Image (Optional)"}</span></label>
                 <span className="prompt-count">{prompt.length}/1000</span>
-                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance prompt</button>
+                <button className={`voice-create ${listening ? "listening" : ""}`} type="button" onClick={listening ? stopVoiceCreation : startVoiceCreation} disabled={!speechSupported || status === "generating"} title={speechSupported ? "Speak your video idea" : "Speech input is not supported in this browser"}>{listening ? "● Listening…" : "🎙 Speak to KIRAVO"}</button>                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance prompt</button>
                 <button className="premium-generate" onClick={generate} disabled={!prompt.trim() || status === "generating"}><span>✦</span>{status === "generating" ? "Generating…" : sourceImage ? "Animate image" : "Generate"} <b>→</b></button>
               </div>
             </div>
@@ -215,7 +253,7 @@ export default function Home() {
             {status === "done" && videoUrl && <div className="video-result premium-result">
   <div className="video-head"><div><span className="eyebrow">YOUR KIRAVO WORLD · {assistant.name}</span><h2>Rendered in <em>motion.</em></h2><p className="result-meta">{model} · {style} · {aspectRatio} · {duration}s · {creditLabel}</p></div><span className="ready">READY</span></div>
   <div className="result-stage"><video src={videoUrl} controls autoPlay playsInline className="generated-video" /></div>
-  <div className="result-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><a className="download" href={videoUrl} download={Boolean(syncedVideoUrl)}>Download ↓</a><button className="retry" onClick={remixProject}>↻ Remix</button><button className="retry" onClick={()=>lastProjectId && router.push(`/editor?project=${encodeURIComponent(lastProjectId)}`)}>✂ Edit</button><button className="retry" onClick={shareProject}>⌁ Share</button><button className="retry" onClick={clearPrompt}>＋ New</button></div>
+  <div className="result-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><a className="download" href={videoUrl} download>Download ↓</a><button className="retry" onClick={remixProject}>↻ Remix</button><button className="retry" onClick={()=>lastProjectId && router.push(`/editor?project=${encodeURIComponent(lastProjectId)}`)}>✂ Edit</button><button className="retry" onClick={shareProject}>⌁ Share</button><button className="retry" onClick={clearPrompt}>＋ New</button></div>
   <div className="result-insight"><span>✦ {assistant.name} direction</span><p>{prompt}</p></div>
 </div>}
 
