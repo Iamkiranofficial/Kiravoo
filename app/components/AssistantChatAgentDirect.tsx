@@ -365,6 +365,19 @@ export default function AssistantChatAgentDirect() {
       wsRef.current.send(JSON.stringify({ realtimeInput: { text } }));
       return;
     }
+
+    const wantsVideo = /\\b(create|generate|make|render|produce|animate)\\b[\\s\\S]*\\bvideo\\b|\\bvideo\\b[\\s\\S]*\\b(create|generate|make|render|produce|animate)\\b/i.test(text);
+    if (wantsVideo) {
+      setBusy(true);
+      try {
+        const result = await createVideo({ prompt: text });
+        setMessages(items => [...items, { role: "assistant", content: "Done — your video render has started. I’ve added it to the Render Dashboard so you can watch the progress there." }]);
+      } catch (e) {
+        setMessages(items => [...items, { role: "assistant", content: e instanceof Error ? e.message : "I couldn't start the video render." }]);
+      } finally { setBusy(false); }
+      return;
+    }
+
     setBusy(true);
     try {
       const r = await fetch("/api/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assistant, language, messages: [...messages, { role: "user", content: text }] }) });
