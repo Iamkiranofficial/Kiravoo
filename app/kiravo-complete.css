@@ -192,3 +192,53 @@
 .page-masthead h2{font-family:Georgia,serif;font-size:clamp(40px,5vw,66px);font-weight:400;letter-spacing:-.045em;line-height:.95;margin:8px 0;color:#f5ede2}.page-masthead h2 em{font-style:italic;color:#d8b36a}.page-masthead p{max-width:580px;color:#938a82;font-size:12px;margin:0}.masthead-symbol{width:100px;height:100px;display:grid;place-items:center;border:1px solid #d8b36a55;border-radius:20px;color:#f1d18a;font:400 58px Georgia,serif;box-shadow:0 0 55px #d8b36a14,inset 0 1px #fff2;background:linear-gradient(145deg,#d8b36a0d,#8b3b4310);transform:rotate(8deg)}
 .page-create:before{background:radial-gradient(circle at 80% 50%,#d8b36a2a,transparent 26%)}.page-director:before{background:radial-gradient(circle at 80% 50%,#8b3b4328,transparent 26%)}.page-projects:before,.page-history:before{background:radial-gradient(circle at 80% 50%,#d8b36a1d,transparent 26%)}.page-editor:before{background:radial-gradient(circle at 80% 50%,#a9783a24,transparent 26%)}.page-settings:before{background:radial-gradient(circle at 80% 50%,#8b3b431e,transparent 26%)}
 @media(max-width:700px){.page-masthead{margin:0 0 14px;padding:26px 20px;min-height:165px}.masthead-symbol{width:68px;height:68px;font-size:40px}.page-masthead h2{font-size:42px}.page-masthead p{font-size:11px;max-width:300px}}
+
+/* KIRAVO REFERENCE HOME — pixel-aligned desktop pass */
+@media(min-width:1101px){
+  .workspace-sidebar{width:236px;padding:24px 16px 20px;background:linear-gradient(180deg,#08090a,#050607);border-right:1px solid #ffffff12;box-shadow:none}
+  .workspace-main{margin-left:236px}
+  .sidebar-brand{padding:2px 18px 38px;font-family:Georgia,serif;font-size:25px;letter-spacing:.17em}
+  .sidebar-brand .brand-mark{display:none}
+  .sidebar-label{display:none}
+  .sidebar-nav{gap:7px}
+  .sidebar-link{padding:12px 14px;border-radius:11px;gap:13px;color:#a49d98}
+  .sidebar-link span{font-size:18px;width:22px}
+  .sidebar-link b{font-size:13px;font-weight:500}
+  .sidebar-link.active{background:linear-gradient(90deg,#d8b36a16,#d8b36a05);border-color:#d8b36a55;box-shadow:0 0 24px #d8b36a10,inset 0 0 0 1px #d8b36a10}
+  .sidebar-link.active i{background:#d8b36a;box-shadow:0 0 12px #d8b36a}
+  .sidebar-pro{margin:88px 10px 0;padding:17px 15px;border:1px solid #ffffff18;border-radius:13px;background:linear-gradient(145deg,#15120e,#0c0c0c);box-shadow:0 15px 35px #0008}
+  .sidebar-pro-title{display:flex;align-items:center;gap:8px;color:#e8bd68;font-size:12px;letter-spacing:.05em}
+  .sidebar-pro-title:first-letter{font-size:18px}
+  .sidebar-pro p{margin:15px 0;color:#aaa19a;font-size:11px;line-height:1.55}
+  .sidebar-pro button{width:100%;border:0;border-radius:8px;padding:10px;background:linear-gradient(135deg,#f0cf87,#d39b4f);color:#20150b;font-weight:800;cursor:pointer}
+  .sidebar-quote{margin:52px 10px 0;color:#aaa19a;font:italic 16px/1.45 Georgia,serif}
+  .sidebar-quote em{color:#c8c0b8}
+  .sidebar-quote span{display:block;margin-top:10px;text-align:right;font-style:normal;font-size:12px}
+  .sidebar-bottom{display:none}
+  .kiravo-topnav{height:78px;padding-left:72px!important;padding-right:28px!important}
+  .kiravo-topnav .kiravo-wordmark{display:none!important}
+  .kiravo-topnav .nav-links{gap:34px;margin:0 auto}
+  .kiravo-topnav .nav-link-button{font-size:14px;color:#aaa39e}
+  .kiravo-topnav .nav-link-button.active{color:#e9bd69}
+  .kiravo-topnav .nav-link-button.active:after{bottom:-18px}
+  .nav-actions{gap:15px}
+  .hero{max-width:1240px;padding:22px 30px 0;margin:0 auto}
+  .hero>.eyebrow{display:none}
+  .kiravo-hero{max-width:none;min-height:290px;margin:0;border-radius:0}
+  .kiravo-hero-copy{padding:25px 0 0 20px}
+  .kiravo-hero-copy h1{font-size:clamp(54px,4.65vw,72px)!important}
+  .kiravo-hero-figure{right:11%;top:-6px;transform:scale(1.05)}
+  .hero-mantra{right:22px;top:76px}
+  .premium-composer{max-width:none;margin:-1px 0 22px;padding:17px 22px 10px}
+  .premium-composer-bottom .enhance-prompt{display:none}
+  .premium-composer-bottom{gap:14px}
+  .premium-generate{min-width:280px}
+  .models-section,.showcase-section{max-width:none}
+  .model-showcase{gap:14px}
+  .model-card{min-height:190px}
+  .showcase-art{height:150px}
+  .creator-nav{display:none!important}
+}
+@media(max-width:1100px){
+  .sidebar-pro,.sidebar-quote{display:none}
+}
