@@ -62,13 +62,13 @@ export default function DashboardPage() {
     <style>{styles}</style>
     <header className="top">
       <a className="brand" href="/"><span>K</span>KIRAVO</a>
-      <div className="top-actions"><span className="engine"><i /> RENDER ENGINE ONLINE</span><a href="/">← Studio</a></div>
+      <div className="top-actions"><span className="engine"><i /> RENDER ENGINE ONLINE</span><a className="dashboard-studio-link" href="/">← Studio</a></div>
     </header>
 
     <section className="hero">
       <div>
-        <span className="kicker">KIRAVO CONTROL CENTER</span>
-        <h1>Render <em>Dashboard.</em></h1>
+        <span className="kicker">KIRAVO CONTROL CENTER · LIVE</span>
+        <h1>Render <em>Dashboard.</em></h1><div className="live-pill">● LIVE RENDER QUEUE</div>
         <p>Every render started by your AI assistant appears here. Track progress, preview finished videos and open the final file.</p>
       </div>
       <div className="stats">
