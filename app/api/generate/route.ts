@@ -1,3 +1,5 @@
+import { submitPixazo, pixazoJobId } from "@/lib/pixazo";
+
 const MAGIC_HOUR_API = "https://api.magichour.ai";
 const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
 const HF_LTX23_SPACE = "https://lightricks-ltx-2-3.hf.space";
@@ -163,6 +165,31 @@ export async function POST(request: Request) {
     const supported = model === "wan-2.2" ? wanDurations : ltxDurations;
     if (!supported.has(duration)) {
       return Response.json({ error: `${model} supports ${model === "wan-2.2" ? "3–8" : "1–8"} seconds on the video engine.` }, { status: 400 });
+    }
+
+    // Pixazo LTX is the primary cloud provider for LTX 2.3 when configured.
+    // The API key remains server-side; the client only receives an opaque job id.
+    if (process.env.PIXAZO_API_KEY && model === "ltx-2.3") {
+      const { height, width } = dimensions(aspectRatio);
+      const targetFrames = Math.max(17, 8 * Math.round((duration * 24 - 1) / 8) + 1);
+      const result = await submitPixazo(prompt, {
+        aspect: aspectRatio,
+        width,
+        height,
+        num_frames: targetFrames,
+        frame_rate: 24,
+      });
+      return Response.json({
+        id: pixazoJobId(result.polling_url),
+        provider: "pixazo",
+        status: "queued",
+        duration,
+        model: "ltx-2.3",
+        aspectRatio,
+        style,
+        audio: false,
+        creditsCharged: 0,
+      });
     }
 
     // Free development worker has priority when connected.
