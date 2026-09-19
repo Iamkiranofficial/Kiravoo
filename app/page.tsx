@@ -51,6 +51,7 @@ export default function Home() {
   const [sourceImage, setSourceImage] = useState<File | null>(null);
   const [promptMode, setPromptMode] = useState<"story" | "shot" | "product">("story");
   const [copied, setCopied] = useState(false);
+  const [lastProjectId, setLastProjectId] = useState("");
   const router = useRouter();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const durations = model === "wan-2.2" ? [3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7, 8];
@@ -108,7 +109,7 @@ export default function Home() {
       if (!response.ok) throw new Error(data.error || "Could not check the render status.");
       if (data.status === "complete" && data.url) {
         const project: Project = { id, prompt: meta?.prompt || prompt.trim(), url: data.url, createdAt: new Date().toISOString(), aspectRatio: meta?.aspectRatio || aspectRatio, style: meta?.style || style, duration: meta?.duration || duration, model: meta?.model || model, name: meta?.name || (meta?.prompt || prompt).slice(0, 42), assistant: assistant.name, language };
-        setVideoUrl(data.url); setStatus("done"); saveHistory(project); return;
+        setVideoUrl(data.url); setLastProjectId(id); setStatus("done"); saveHistory(project); return;
       }
       if (data.status === "error" || data.status === "canceled") throw new Error(data.error || "The render did not complete.");
       setStage(data.status === "queued" ? "Your render is queued…" : "Rendering your world…");
@@ -155,7 +156,7 @@ export default function Home() {
     setPrompt(`${base.replace(/[. ]+$/, "")},${suffix}.`);
   };
   const applySuggestion = (text: string) => setPrompt(text);
-  const clearPrompt = () => { setPrompt(""); setSourceImage(null); setStatus("idle"); setError(""); setVideoUrl(""); };
+  const clearPrompt = () => { setPrompt(""); setSourceImage(null); setStatus("idle"); setError(""); setVideoUrl(""); setLastProjectId(""); };
   const copyPrompt = async () => {
     try { await navigator.clipboard.writeText(prompt); setCopied(true); window.setTimeout(() => setCopied(false), 1400); } catch {}
   };
@@ -221,6 +222,7 @@ export default function Home() {
   <div className="studio-tray-row"><div className="prompt-mode"><span>Prompt mode</span>{[["story","Story"],["shot","Shot"],["product","Product"]].map(([id,label])=><button key={id} className={promptMode===id?"active":""} onClick={()=>setPromptMode(id as typeof promptMode)}>{label}</button>)}</div><button className="enhance-prompt" onClick={enhancePrompt}>✦ Enhance prompt</button><button className="copy-prompt" onClick={copyPrompt}>{copied ? "Copied ✓" : "Copy prompt"}</button><button className={audio ? "audio-toggle on" : "audio-toggle"} onClick={()=>setAudio((x)=>!x)} disabled={model==="wan-2.2"}>Audio {audio ? "On" : "Off"}</button></div>
   {sourceImage && <div className="reference-pill">▧ Reference image ready · {sourceImage.name}<button onClick={()=>setSourceImage(null)}>Remove</button></div>}
 </div>}
+<div className="studio-suggestions"><span>START WITH</span><button onClick={()=>applySuggestion("A cinematic drone shot flying over Hyderabad at sunset, warm haze, slow camera movement, realistic city detail")}>Hyderabad at sunset</button><button onClick={()=>applySuggestion("A luxury fashion film in a rain-soaked neon street, elegant camera movement, glossy reflections")}>Neon fashion</button><button onClick={()=>applySuggestion("A lone astronaut discovers an ancient glowing temple on an alien planet, epic cinematic lighting")}>Alien temple</button><button onClick={()=>applySuggestion("A premium product commercial for a futuristic smartphone, black studio, dramatic rim light")}>Product film</button></div>
             <section className="models-section">
               <div className="section-heading"><div><h2>Our Models</h2><p>Built for creators. Designed for the extraordinary.</p></div><button onClick={() => navigate("Settings")}>View All Models →</button></div>
               <div className="model-showcase">
@@ -247,7 +249,7 @@ export default function Home() {
             {status === "done" && videoUrl && <div className="video-result premium-result">
   <div className="video-head"><div><span className="eyebrow">YOUR KIRAVO WORLD · {assistant.name}</span><h2>Rendered in <em>motion.</em></h2><p className="result-meta">{model} · {style} · {aspectRatio} · {duration}s · {creditLabel}</p></div><span className="ready">READY</span></div>
   <div className="result-stage"><video src={videoUrl} controls autoPlay playsInline className="generated-video" /></div>
-  <div className="result-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><a className="download" href={videoUrl} download>Download ↓</a><button className="retry" onClick={remixProject}>↻ Remix</button><button className="retry" onClick={()=>router.push(`/editor?project=${encodeURIComponent(history[0]?.id || "")}`)}>✂ Edit</button><button className="retry" onClick={shareProject}>⌁ Share</button><button className="retry" onClick={clearPrompt}>＋ New</button></div>
+  <div className="result-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><a className="download" href={videoUrl} download>Download ↓</a><button className="retry" onClick={remixProject}>↻ Remix</button><button className="retry" onClick={()=>lastProjectId && router.push(`/editor?project=${encodeURIComponent(lastProjectId)}`)}>✂ Edit</button><button className="retry" onClick={shareProject}>⌁ Share</button><button className="retry" onClick={clearPrompt}>＋ New</button></div>
   <div className="result-insight"><span>✦ {assistant.name} direction</span><p>{prompt}</p></div>
 </div>}
           </>}
