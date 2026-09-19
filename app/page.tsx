@@ -44,6 +44,9 @@ export default function Home() {
   const [scenes, setScenes] = useState<string[]>([]);
   const [directorThinking, setDirectorThinking] = useState(false);
   const [directorPlan, setDirectorPlan] = useState("");
+  const [scenePrompts, setScenePrompts] = useState<string[]>([]);
+  const [sceneResults, setSceneResults] = useState<Array<{ scene: number; url: string }>>([]);
+  const [filmBuilding, setFilmBuilding] = useState(false);
   const [mediaMode, setMediaMode] = useState<"image" | "voice">("image");
   const [mediaImage, setMediaImage] = useState<File | null>(null);
   const [mediaAudio, setMediaAudio] = useState<File | null>(null);
@@ -171,11 +174,73 @@ export default function Home() {
       if (!response.ok) throw new Error(data.error || "AI Director could not plan the video.");
       if (data.prompt) setPrompt(String(data.prompt).slice(0, 1000));
       if (Array.isArray(data.scenes)) setScenes(data.scenes);
+      if (Array.isArray(data.scenePrompts)) setScenePrompts(data.scenePrompts);
       if (data.plan) setDirectorPlan(String(data.plan));
     } catch (e) {
       setError(e instanceof Error ? e.message : "AI Director failed.");
     } finally {
       setDirectorThinking(false);
+    }
+  };
+
+  const buildFullFilm = async () => {
+    if (filmBuilding || !prompt.trim()) return;
+    setFilmBuilding(true);
+    setError("");
+    setSceneResults([]);
+    setStatus("generating");
+    try {
+      setStage("KIRAVO Director is planning the scenes…");
+      const directorResponse = await fetch("/api/director", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: prompt.trim(), assistantName: assistant.name, assistantTag: assistant.tag, style, aspectRatio, duration, language }),
+        cache: "no-store"
+      });
+      const directorData = await directorResponse.json();
+      if (!directorResponse.ok) throw new Error(directorData.error || "AI Director could not create the scene plan.");
+      const prompts = Array.isArray(directorData.scenePrompts) ? directorData.scenePrompts.slice(0, 4).map(String) : [];
+      if (!prompts.length) throw new Error("AI Director did not return scene prompts.");
+      if (directorData.prompt) setPrompt(String(directorData.prompt).slice(0, 1000));
+      if (Array.isArray(directorData.scenes)) setScenes(directorData.scenes);
+      if (directorData.plan) setDirectorPlan(String(directorData.plan));
+      setScenePrompts(prompts);
+
+      const completed: Array<{ scene: number; url: string }> = [];
+      for (let i = 0; i < prompts.length; i++) {
+        setStage("Generating scene " + (i + 1) + " of " + prompts.length + "…");
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: prompts[i], model: "ltx-2.3", aspectRatio, style, duration, audio: false, assistant: assistant.id, language }),
+          cache: "no-store"
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.id) throw new Error(data.error || "Scene " + (i + 1) + " could not start.");
+        const started = Date.now();
+        let finished = false;
+        while (Date.now() - started < 900000) {
+          const statusResponse = await fetch("/api/generate/status?id=" + encodeURIComponent(data.id), { cache: "no-store" });
+          const statusData = await statusResponse.json().catch(() => ({}));
+          if (!statusResponse.ok) throw new Error(statusData.error || "Could not check scene " + (i + 1) + ".");
+          if (statusData.status === "complete" && statusData.url) {
+            completed.push({ scene: i + 1, url: statusData.url });
+            setSceneResults([...completed]);
+            finished = true;
+            break;
+          }
+          if (statusData.status === "error" || statusData.status === "canceled") throw new Error(statusData.error || "Scene " + (i + 1) + " failed.");
+          await new Promise<void>((resolve) => { timer.current = setTimeout(resolve, 3000); });
+        }
+        if (!finished) throw new Error("Scene " + (i + 1) + " timed out.");
+      }
+      setStage("All scenes generated.");
+      setStatus("done");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Film generation failed.");
+      setStatus("error");
+    } finally {
+      setFilmBuilding(false);
     }
   };
 
@@ -238,7 +303,7 @@ export default function Home() {
               <div className="premium-composer-bottom">
                 <label className={`image-add ${sourceImage ? "selected" : ""}`}><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden onChange={(e) => setSourceImage(e.target.files?.[0] || null)} />▧ <span>{sourceImage ? sourceImage.name : "Add Image (Optional)"}</span></label>
                 <span className="prompt-count">{prompt.length}/1000</span>
-                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt" onClick={directPrompt} disabled={!prompt.trim() || directorThinking}>{directorThinking ? "◌ Director thinking…" : "✦ AI Director"}</button><button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance prompt</button>
+                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt" onClick={directPrompt} disabled={!prompt.trim() || directorThinking}>{directorThinking ? "◌ Director thinking…" : "✦ AI Director"}</button><button className="enhance-prompt" onClick={buildFullFilm} disabled={!prompt.trim() || filmBuilding}>{filmBuilding ? "◌ Building scenes…" : "✦ Build Film"}</button><button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance prompt</button>
                 <button className="premium-generate" onClick={generate} disabled={!prompt.trim() || status === "generating"}><span>✦</span>{status === "generating" ? "Generating…" : sourceImage ? "Animate image" : "Generate"} <b>→</b></button>
               </div>
             </div>
@@ -266,7 +331,7 @@ export default function Home() {
   <div className="studio-tray-row"><div className="prompt-mode"><span>Prompt mode</span>{[["story","Story"],["shot","Shot"],["product","Product"]].map(([id,label])=><button key={id} className={promptMode===id?"active":""} onClick={()=>setPromptMode(id as typeof promptMode)}>{label}</button>)}</div><button className="enhance-prompt" onClick={enhancePrompt}>✦ Enhance prompt</button><button className="copy-prompt" onClick={copyPrompt}>{copied ? "Copied ✓" : "Copy prompt"}</button><button className={audio ? "audio-toggle on" : "audio-toggle"} onClick={()=>setAudio((x)=>!x)} disabled={model==="wan-2.2"}>Audio {audio ? "On" : "Off"}</button></div>
   {sourceImage && <div className="reference-pill">▧ Reference image ready · {sourceImage.name}<button onClick={()=>setSourceImage(null)}>Remove</button></div>}
 </div>}
-<div className="studio-suggestions"><span>START WITH</span><button onClick={()=>applySuggestion("A cinematic drone shot flying over Hyderabad at sunset, warm haze, slow camera movement, realistic city detail")}>Hyderabad at sunset</button><button onClick={()=>applySuggestion("A luxury fashion film in a rain-soaked neon street, elegant camera movement, glossy reflections")}>Neon fashion</button><button onClick={()=>applySuggestion("A lone astronaut discovers an ancient glowing temple on an alien planet, epic cinematic lighting")}>Alien temple</button><button onClick={()=>applySuggestion("A premium product commercial for a futuristic smartphone, black studio, dramatic rim light")}>Product film</button></div>
+<div className="director-ai-plan" aria-live="polite">{directorPlan && <p>{directorPlan}</p>}{scenes.length > 0 && <div>{scenes.map((scene,i)=><span key={i}>{String(i+1).padStart(2,"0")} · {scene}</span>)}</div>}{sceneResults.length > 0 && <div>{sceneResults.map((item)=><span key={item.scene}>Scene {String(item.scene).padStart(2,"0")} · <a href={item.url} target="_blank" rel="noreferrer">Open clip ↗</a></span>)}</div>}</div><div className="studio-suggestions"><span>START WITH</span><button onClick={()=>applySuggestion("A cinematic drone shot flying over Hyderabad at sunset, warm haze, slow camera movement, realistic city detail")}>Hyderabad at sunset</button><button onClick={()=>applySuggestion("A luxury fashion film in a rain-soaked neon street, elegant camera movement, glossy reflections")}>Neon fashion</button><button onClick={()=>applySuggestion("A lone astronaut discovers an ancient glowing temple on an alien planet, epic cinematic lighting")}>Alien temple</button><button onClick={()=>applySuggestion("A premium product commercial for a futuristic smartphone, black studio, dramatic rim light")}>Product film</button></div>
             <section className="models-section">
               <div className="section-heading"><div><h2>Our Models</h2><p>Built for creators. Designed for the extraordinary.</p></div><button onClick={() => navigate("Settings")}>View All Models →</button></div>
               <div className="model-showcase">
