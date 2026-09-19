@@ -1,4 +1,4 @@
-const PIXAZO_LTX_ENDPOINT = "https://gateway.pixazo.ai/ltx-2-3-quality-text-to-video/v1/ltx-2-3-quality-text-to-video-request";
+const PIXAZO_LTX_ENDPOINT = "https://gateway.pixazo.ai/ltx-video/v1/text-to-video";
 const PIXAZO_GATEWAY_HOST = "gateway.pixazo.ai";
 
 export type PixazoResult = {
@@ -32,20 +32,6 @@ export async function submitPixazo(prompt: string, options?: {
     },
     body: JSON.stringify({
       prompt: prompt.trim(),
-      num_frames: options?.num_frames ?? 121,
-      resolution: options?.aspect === "9:16"
-        ? "portrait_16_9"
-        : options?.aspect === "1:1"
-          ? "square_hd"
-          : "landscape_16_9",
-      frames_per_second: options?.frame_rate ?? 24,
-      num_inference_steps: 15,
-      guidance_scale: 1,
-      generate_audio: false,
-      enable_prompt_expansion: true,
-      enable_safety_checker: true,
-      video_quality: "high",
-      video_write_mode: "balanced",
     }),
     cache: "no-store",
   });
