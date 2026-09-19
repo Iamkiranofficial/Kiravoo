@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
-
 function fallbackPlan(input: any) {
   const base = String(input.prompt || "").trim();
   const style = String(input.style || "Cinematic");
@@ -24,28 +22,40 @@ export async function POST(request: Request) {
     if (prompt.length > 12000) return NextResponse.json({ error: "The idea is too long." }, { status: 400 });
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return NextResponse.json(fallbackPlan(body));
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: [
-        "You are KIRAVO’s AI Creative Director.",
-        "Transform the user’s rough idea into a production-ready video concept.",
-        "Do not merely rewrite the sentence. Infer useful visual details without changing the user’s core intent.",
-        "Think through subject, environment, action, camera, lighting, composition, continuity, pacing and a clear beginning/middle/end.",
-        "Return ONLY valid JSON with keys: prompt, plan, worldBible, scenes, scenePrompts, continuity.",
-        "prompt must be a single detailed generation prompt.",
-        "plan must be one concise sentence explaining the creative direction.",
-        "scenes must be an array of 4 concise scene descriptions. scenePrompts must be an array of 4 detailed, standalone video-generation prompts, one per scene, each preserving the same characters, wardrobe, environment and visual style. worldBible must be a concise object with character, environment, visualStyle and continuityAnchors. continuity must be a concise list of rules that every scene must follow.",
-        "Avoid claims that require external research. Do not invent named real people.",
-        "User idea: " + prompt,
-        "Assistant: " + String(body?.assistantName || "KIRAVO") + " (" + String(body?.assistantTag || "Creative Director") + ")",
-        "Style: " + String(body?.style || "Cinematic"),
-        "Aspect ratio: " + String(body?.aspectRatio || "16:9"),
-        "Duration: " + String(body?.duration || 2) + " seconds",
-        "Language: " + String(body?.language || "Auto-detect")
-      ].join("\n") }] }]
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: [
+          "You are KIRAVO’s AI Creative Director.",
+          "Transform the user’s rough idea into a production-ready video concept.",
+          "Do not merely rewrite the sentence. Infer useful visual details without changing the user’s core intent.",
+          "Think through subject, environment, action, camera, lighting, composition, continuity, pacing and a clear beginning/middle/end.",
+          "Return ONLY valid JSON with keys: prompt, plan, worldBible, scenes, scenePrompts, continuity.",
+          "prompt must be a single detailed generation prompt.",
+          "plan must be one concise sentence explaining the creative direction.",
+          "scenes must be an array of 4 concise scene descriptions. scenePrompts must be an array of 4 detailed, standalone video-generation prompts, one per scene, each preserving the same characters, wardrobe, environment and visual style. worldBible must be a concise object with character, environment, visualStyle and continuityAnchors. continuity must be a concise list of rules that every scene must follow.",
+          "Avoid claims that require external research. Do not invent named real people.",
+          "User idea: " + prompt,
+          "Assistant: " + String(body?.assistantName || "KIRAVO") + " (" + String(body?.assistantTag || "Creative Director") + ")",
+          "Style: " + String(body?.style || "Cinematic"),
+          "Aspect ratio: " + String(body?.aspectRatio || "16:9"),
+          "Duration: " + String(body?.duration || 2) + " seconds",
+          "Language: " + String(body?.language || "Auto-detect")
+        ].join("\n") }] }],
+        generationConfig: { responseMimeType: "application/json" },
+      }),
+      cache: "no-store",
     });
-    const text = response.text || "";
+    const responseData = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = typeof responseData?.error?.message === "string" ? responseData.error.message : `Gemini returned HTTP ${response.status}.`;
+      throw new Error(message);
+    }
+    const text = responseData?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join("") || "";
     const cleaned = text.replace(/^\s*```json\s*/i, "").replace(/\s*```\s*$/i, "").trim();
     const data = JSON.parse(cleaned);
     if (!data.prompt || !Array.isArray(data.scenes)) throw new Error("Director returned an incomplete plan.");
