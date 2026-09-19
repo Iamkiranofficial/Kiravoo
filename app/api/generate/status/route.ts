@@ -64,7 +64,7 @@ async function readKaggleJob(jobId: string) {
   return Response.json({ id: jobId, status: data?.status || "processing", url, error: data?.error || null, provider: "kaggle" });
 }
 function findVideoUrl(value: unknown): string | null {
-  if (typeof value === "string" && /^https?:\\/\\//.test(value)) {
+  if (typeof value === "string" && /^https?:\/\//.test(value)) {
     return value;
   }
   if (!value || typeof value !== "object") return null;
@@ -78,7 +78,7 @@ function findVideoUrl(value: unknown): string | null {
   const item = value as Record<string, unknown>;
   for (const key of ["video_url", "videoUrl", "url", "download_url", "downloadUrl"]) {
     const candidate = item[key];
-    if (typeof candidate === "string" && /^https?:\\/\\//.test(candidate)) return candidate;
+    if (typeof candidate === "string" && /^https?:\/\//.test(candidate)) return candidate;
   }
   for (const key of ["data", "result", "output", "video"]) {
     const found = findVideoUrl(item[key]);
