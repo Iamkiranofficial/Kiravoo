@@ -20,8 +20,8 @@ const languages = ["Auto-detect", "English", "తెలుగు", "हिन्
 const models = [{ id: "ltx-2.3", label: "LTX Video Fast", note: "Free · auto" }, { id: "wan-2.2", label: "Wan 2.2", note: "Detailed" }];
 const ratios = ["16:9", "9:16", "1:1"];
 const styles = ["Cinematic", "Realistic", "Anime", "Commercial", "Dreamy"];
-const nav = ["Studio", "Create", "Director", "Projects", "Editor", "History", "Explore", "Settings"];
-const icons = ["⌂", "✦", "✧", "▣", "◫", "◷", "◇", "⚙"];
+const nav = ["Studio", "Create", "Director", "Dashboard", "Projects", "Editor", "History", "Explore", "Settings"];
+const icons = ["⌂", "✦", "✧", "▤", "▣", "◫", "◷", "◇", "⚙"];
 
 export default function Home() {
   const [active, setActive] = useState("Studio");
@@ -96,6 +96,11 @@ export default function Home() {
   const chooseAssistant = (x: Assistant) => { setAssistant(x); localStorage.setItem("kiravo-assistant", x.id); setAssistantOpen(false); };
   const chooseLanguage = (x: string) => { setLanguage(x); localStorage.setItem("kiravo-language", x); };
   const navigate = (x: string) => {
+    if (x === "Dashboard") {
+      router.push("/dashboard");
+      setSidebarOpen(false);
+      return;
+    }
     const update = () => { setActive(x); setSidebarOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); };
     const doc = document as Document & { startViewTransition?: (callback: () => void) => unknown };
     if (doc.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -315,7 +320,7 @@ export default function Home() {
       <aside className={`workspace-sidebar ${sidebarOpen ? "open" : ""}`}><div className="sidebar-brand"><span className="brand-mark">K</span><span>KIRAVO</span></div><div className="sidebar-label">CREATE</div><div className="sidebar-nav">{nav.map((item, i) => <button key={item} className={`sidebar-link ${active === item ? "active" : ""}`} onClick={() => navigate(item)}><span>{icons[i]}</span><b>{["Video","Image","Edit","Animate","Enhance","Audio","Assets","Settings"][i]}</b>{active === item && <i />}</button>)}</div><div className="sidebar-bottom"><div className="sidebar-status"><span className="pulse" /> VIDEO ENGINE <b>ONLINE</b></div><button className="sidebar-home" onClick={() => navigate("Studio")}>← Back to Studio</button></div></aside>
       {sidebarOpen && <button className="sidebar-scrim" aria-label="Close menu" onClick={() => setSidebarOpen(false)} />}
       <div className="workspace-main">
-        <nav className="nav kiravo-topnav"><button className="sidebar-toggle" aria-label="Open workspace menu" onClick={() => setSidebarOpen(true)}>☰</button><div className="brand kiravo-wordmark"><span>KIRAVO</span><small>CREATE BEYOND REALITY</small></div><div className="nav-links"><button className={`nav-link-button ${active === "Studio" ? "active" : ""}`} onClick={() => navigate("Studio")}>Home</button><button className="nav-link-button" onClick={() => navigate("Create")}>Create</button><button className="nav-link-button" onClick={() => navigate("Settings")}>Models</button><button className="nav-link-button" onClick={() => navigate("Explore")}>Gallery</button><button className="nav-link-button" onClick={() => navigate("Editor")}>Tools</button><button className="nav-link-button" onClick={() => navigate("Settings")}>Pricing</button><button className="nav-link-button" onClick={() => navigate("Explore")}>Community</button></div><div className="nav-actions"><button className="nav-icon">⌕</button><button className="nav-icon">♧</button><button className="profile">KB</button><span className="profile-copy"><b>Kiran</b><small>Creator</small></span><button className="nav-icon">⌄</button></div></nav>
+        <nav className="nav kiravo-topnav"><button className="sidebar-toggle" aria-label="Open workspace menu" onClick={() => setSidebarOpen(true)}>☰</button><div className="brand kiravo-wordmark"><span>KIRAVO</span><small>CREATE BEYOND REALITY</small></div><div className="nav-links"><button className={`nav-link-button ${active === "Studio" ? "active" : ""}`} onClick={() => navigate("Studio")}>Home</button><button className="nav-link-button" onClick={() => navigate("Create")}>Create</button><button className="nav-link-button" onClick={() => navigate("Settings")}>Models</button><button className="nav-link-button" onClick={() => navigate("Dashboard")}>Dashboard</button><button className="nav-link-button" onClick={() => navigate("Explore")}>Gallery</button><button className="nav-link-button" onClick={() => navigate("Editor")}>Tools</button><button className="nav-link-button" onClick={() => navigate("Settings")}>Pricing</button><button className="nav-link-button" onClick={() => navigate("Explore")}>Community</button></div><div className="nav-actions"><button className="nav-icon">⌕</button><button className="nav-icon">♧</button><button className="profile">KB</button><span className="profile-copy"><b>Kiran</b><small>Creator</small></span><button className="nav-icon">⌄</button></div></nav>
         <section className="hero">
           <div className="eyebrow"><span className="pulse" /> AI CREATIVE STUDIO · {active.toUpperCase()}</div>
           {active === "Studio" && <>
