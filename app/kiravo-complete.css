@@ -242,3 +242,38 @@
 @media(max-width:1100px){
   .sidebar-pro,.sidebar-quote{display:none}
 }
+
+
+/* KIRAVO REFERENCE IMAGE FINISH — visual assets */
+@media(min-width:701px){
+  .model-card{
+    background-size:cover!important;
+    background-position:center!important;
+  }
+  .model-cinema{background-image:url("https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=900&q=88")!important}
+  .model-real{background-image:url("https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=88")!important}
+  .model-anime{background-image:url("https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=900&q=88")!important}
+  .model-flow{background-image:url("https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=900&q=88")!important}
+}
+.model-card:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:1;
+  background:linear-gradient(180deg,#05050518 0%,#05050522 35%,#050505e8 100%);
+  pointer-events:none;
+}
+.model-card .model-badge,.model-card .model-pill,.model-card .model-copy{z-index:3}
+.showcase-art{background-color:#14110d;background-size:cover;background-position:center}
+.showcase-art:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg,#00000008 20%,#000000b8 100%);
+  z-index:1;
+  pointer-events:none;
+}
+.showcase-art span{z-index:3}
+@media(max-width:700px){
+  .model-card{background-size:cover!important;background-position:center!important}
+}
