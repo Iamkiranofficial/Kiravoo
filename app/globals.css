@@ -109,3 +109,110 @@ body{background:var(--kiravo-ink);color:var(--kiravo-text)}
 }
 .cards article:hover,.history-grid article:hover,.project-card:hover{box-shadow:0 45px 90px #000e,0 0 38px #d8b36a14}
 .cards .icon{background:linear-gradient(145deg,#d8b36a,#8b3b43);color:#17100b}
+
+
+/* KIRAVO CROSS-PAGE PREMIUM SYSTEM v1 — keeps every workspace surface visually consistent with Studio */
+.xpage,.projects-page,.ke,.cpage,.director,.settings{
+  background:
+    radial-gradient(ellipse at 50% -8%,#2a2117 0%,transparent 36%),
+    radial-gradient(ellipse at 12% 32%,#32151b45 0%,transparent 28%),
+    radial-gradient(ellipse at 88% 42%,#6d4a1718 0%,transparent 30%),
+    linear-gradient(180deg,#0c0b09 0%,#070706 58%,#050505 100%) !important;
+  color:#f7f1e7 !important;
+}
+.xpage *, .projects-page *, .ke *, .cpage *, .director *, .settings *{box-sizing:border-box}
+.xtop,.projects-top,.top,.ctop,.director .top,.settings .top{
+  border-bottom-color:#d8b36a20 !important;
+}
+.xmark,.projects-mark,.mark,.cmark{
+  background:linear-gradient(145deg,#f1d18a22,#5b202812) !important;
+  border-color:#d8b36a55 !important;
+  box-shadow:0 12px 30px #0009,inset 0 1px #fff7,0 0 24px #d8b36a14;
+}
+.xback,.projects-back,.back,.cnav a,.cnav button,.director .links a,.director .btn,.settings .top a,.settings .btn{
+  color:#d8d0c6 !important;
+  background:linear-gradient(145deg,#d8b36a0e,#ffffff03) !important;
+  border-color:#d8b36a25 !important;
+}
+.xkicker,.projects-kicker,.kicker,.ctop + .cmain .assist,.director .eyebrow,.settings .eyebrow{
+  color:#d8b36a !important;
+}
+.xtitle em,.projects-title em,.title em,.director .hero em,.settings .hero h1 em{
+  background:linear-gradient(90deg,#f1d18a,#d8b36a 48%,#8b3b43 92%) !important;
+  -webkit-background-clip:text !important;background-clip:text !important;color:transparent !important;
+}
+.xsub,.projects-head p,.bio,.director .hero p,.settings .hero p,.hint,.empty,.tool-note,.media-note{
+  color:#aaa095 !important;
+}
+.xsearch,.projects-search,.textarea,.select,.edit input,.edit textarea,.edit select,.settings .select,.control select{
+  background:linear-gradient(145deg,#171310,#0b0a08) !important;
+  border-color:#d8b36a22 !important;
+  color:#f7f1e7 !important;
+}
+.xsearch:focus,.projects-search:focus,.textarea:focus,.select:focus,.edit input:focus,.edit textarea:focus,.edit select:focus,.settings .select:focus{
+  border-color:#d8b36a66 !important;
+  box-shadow:0 0 0 3px #d8b36a0d !important;
+}
+.xcard,.project-card,.card,.panel,.settings .card,.box,.feature-panel{
+  background:linear-gradient(145deg,#181410,#0c0b09) !important;
+  border-color:#d8b36a20 !important;
+  box-shadow:0 30px 80px #000b,inset 0 1px #f1d18a10 !important;
+}
+.xart,.project-preview,.thumb,.stage,.ke .stage{
+  background:
+    radial-gradient(circle at 50% 38%,#6b47241f,transparent 34%),
+    linear-gradient(145deg,#15120f,#070706) !important;
+}
+.xart b,.placeholder,.project-placeholder{
+  color:#e8c982 !important;
+  text-shadow:0 0 30px #d8b36a35 !important;
+}
+.xbadge,.project-badge,.tag{
+  background:#090806cc !important;border-color:#d8b36a30 !important;color:#d8c5a5 !important;
+}
+.xmeta span,.project-meta span,.badge{
+  background:#d8b36a08 !important;border-color:#d8b36a1c !important;color:#bdb09f !important;
+}
+.xactions .primary,.projects-new,.export,.save,.director .primary,.settings .primary{
+  background:linear-gradient(135deg,#f3d894,#d8b36a 48%,#9b5d52) !important;
+  color:#160f0b !important;border-color:#f1d18a !important;
+  box-shadow:0 15px 35px #000b,0 0 28px #d8b36a20 !important;
+}
+.xactions button,.project-actions button,.btn,.toolbar .btn,.tool-chip{
+  background:#d8b36a08 !important;border-color:#d8b36a20 !important;color:#d8d0c6 !important;
+}
+.xactions button:hover,.project-actions button:hover,.btn:hover,.tool-chip:hover{
+  border-color:#d8b36a66 !important;color:#f7f1e7 !important;
+}
+.xmodal,.project-modal,.modal{background:#000d !important;backdrop-filter:blur(8px)}
+.xmodalbox,.project-modal-card,.box{background:#0d0b09 !important;border-color:#d8b36a28 !important}
+.ke .card{background:linear-gradient(145deg,#181410,#0c0b09) !important;border-color:#d8b36a20 !important}
+.ke .toolbar,.timeline,.side,.control{border-color:#d8b36a1c !important}
+.track{background:linear-gradient(90deg,#2a1c15,#0d0b09) !important;border-color:#d8b36a22 !important}
+.wave{background:repeating-linear-gradient(90deg,transparent 0 8px,#d8b36a20 9px 10px) !important}
+.head{background:#f1d18a !important;box-shadow:0 0 15px #d8b36a !important}
+.msg{color:#d8b36a !important}
+.director .panel,.director .shot{background:linear-gradient(145deg,#181410,#0c0b09) !important;border-color:#d8b36a20 !important}
+.director .textarea,.director .select{background:#0a0908 !important}
+.director .shot{color:#d8d0c6 !important}
+.settings .toggle{border-color:#d8b36a18 !important;color:#d8d0c6 !important}
+.settings .on .dot{background:#d8b36a55 !important}
+.settings .on .dot:after{background:#f1d18a !important}
+.cpage .hero,.cpage .edit,.cpage .card{background:linear-gradient(145deg,#181410,#0c0b09) !important;border-color:#d8b36a20 !important}
+.avatar{background:radial-gradient(circle at 35% 30%,#fff4d8,#d8b36a 42%,#5b2028) !important;border-color:#d8b36a55 !important;box-shadow:0 0 35px #d8b36a25 !important}
+.stat b{color:#f1d18a !important}
+.assist{color:#d8b36a !important}
+.creator-nav{
+  background:rgba(10,9,7,.88) !important;
+  border-color:#d8b36a35 !important;
+  box-shadow:0 18px 55px #000b,0 0 30px #d8b36a0b !important;
+}
+.creator-nav button.active{
+  color:#f7f1e7 !important;
+  background:linear-gradient(135deg,#d8b36a20,#8b3b4318) !important;
+  box-shadow:inset 0 0 0 1px #d8b36a35 !important;
+}
+.creator-nav button:hover{background:#d8b36a0c !important;color:#f7f1e7 !important}
+@media(max-width:700px){
+  .xpage,.projects-page,.ke,.cpage,.director,.settings{padding-bottom:100px !important}
+}
