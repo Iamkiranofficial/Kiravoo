@@ -366,7 +366,7 @@ export default function AssistantChatAgentDirect() {
       return;
     }
 
-    const wantsVideo = /\\b(create|generate|make|render|produce|animate)\\b[\\s\\S]*\\bvideo\\b|\\bvideo\\b[\\s\\S]*\\b(create|generate|make|render|produce|animate)\\b/i.test(text);
+    const wantsVideo = /\b(create|generate|make|render|produce|animate)\b[\s\S]*\bvideo\b|\bvideo\b[\s\S]*\b(create|generate|make|render|produce|animate)\b/i.test(text);
     if (wantsVideo) {
       setBusy(true);
       try {
