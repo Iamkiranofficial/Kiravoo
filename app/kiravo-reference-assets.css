@@ -129,16 +129,16 @@
    The sheet is used only as a sprite; neighboring photos can never bleed into a slot.
 */
 :root{
-  --kiravo-photo-sheet:url("https://d2ol7oe51mr4n9c93c22.png");
+  --kiravo-photo-sheet:url("https://d2ol7oe51mr4n9.cloudfront.net/user_30VOH5bBmIivWBteuzKyt0W9tV6/3da45c22-b440-4e18-9b06-d5e556c93a27.png");
 }
 .kiravo-hero-figure{
-  background-image:url("https://d2ol7oe51mr4n9c93c22.png")!important;
+  background-image:url("https://d2ol7oe51mr4n9.cloudfront.net/user_30VOH5bBmIivWBteuzKyt0W9tV6/3da45c22-b440-4e18-9b06-d5e556c93a27.png")!important;
   background-repeat:no-repeat!important;
   background-size:133.6% auto!important;
   background-position:center top!important;
 }
 .model-cinema,.model-real,.model-anime,.model-flow{
-  background-image:url("https://d2ol7oe51mr4n9c93c22.png")!important;
+  background-image:url("https://d2ol7oe51mr4n9.cloudfront.net/user_30VOH5bBmIivWBteuzKyt0W9tV6/3da45c22-b440-4e18-9b06-d5e556c93a27.png")!important;
   background-repeat:no-repeat!important;
   background-size:400% auto!important;
   background-position-y:32%!important;
@@ -148,7 +148,7 @@
 .model-anime{background-position-x:66.666667%!important}
 .model-flow{background-position-x:100%!important}
 .showcase-art{
-  background-image:url("https://d2ol7oe51mr4n9c93c22.png")!important;
+  background-image:url("https://d2ol7oe51mr4n9.cloudfront.net/user_30VOH5bBmIivWBteuzKyt0W9tV6/3da45c22-b440-4e18-9b06-d5e556c93a27.png")!important;
   background-repeat:no-repeat!important;
   background-size:400% auto!important;
   background-position-y:68%!important;
