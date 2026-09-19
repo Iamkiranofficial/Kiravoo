@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import "./motion.module.css";
 import "./kiravo-complete.css";
+import "./kiravo-reference-assets.css";
 
 type Status = "idle" | "generating" | "done" | "error";
 type Assistant = { id: string; name: string; gender: string; tag: string; description: string; greeting: string; orb: string };
