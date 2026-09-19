@@ -52,6 +52,9 @@ export default function Home() {
   const [promptMode, setPromptMode] = useState<"story" | "shot" | "product">("story");
   const [copied, setCopied] = useState(false);
   const [lastProjectId, setLastProjectId] = useState("");
+  const [syncAudioFile, setSyncAudioFile] = useState<File | null>(null);
+  const [syncingAudio, setSyncingAudio] = useState(false);
+  const [syncedVideoUrl, setSyncedVideoUrl] = useState("");
   const router = useRouter();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const durations = model === "wan-2.2" ? [3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7, 8];
@@ -161,6 +164,69 @@ export default function Home() {
     try { await navigator.clipboard.writeText(prompt); setCopied(true); window.setTimeout(() => setCopied(false), 1400); } catch {}
   };
   const remixProject = () => { setStatus("idle"); setError(""); window.scrollTo({ top: 0, behavior: "smooth" }); };
+
+  async function syncAudioToVideo() {
+    if (!videoUrl || !syncAudioFile || syncingAudio) return;
+    setSyncingAudio(true);
+    setError("");
+    try {
+      if (typeof MediaRecorder === "undefined") throw new Error("This browser does not support in-browser audio sync.");
+      const video = document.createElement("video");
+      video.crossOrigin = "anonymous";
+      video.src = videoUrl;
+      video.muted = true;
+      video.playsInline = true;
+      await new Promise<void>((resolve, reject) => {
+        video.onloadedmetadata = () => resolve();
+        video.onerror = () => reject(new Error("KIRAVO could not load the generated video for audio sync."));
+      });
+      const audio = document.createElement("audio");
+      audio.src = URL.createObjectURL(syncAudioFile);
+      audio.preload = "auto";
+      await new Promise<void>((resolve, reject) => {
+        audio.onloadedmetadata = () => resolve();
+        audio.onerror = () => reject(new Error("KIRAVO could not read the selected audio file."));
+      });
+
+      const videoStream = video.captureStream();
+      const audioStream = audio.captureStream();
+      const mixed = new MediaStream();
+      videoStream.getVideoTracks().forEach((track) => mixed.addTrack(track));
+      audioStream.getAudioTracks().forEach((track) => mixed.addTrack(track));
+
+      const mimeTypes = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+      const mimeType = mimeTypes.find((type) => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) throw new Error("This browser cannot create the synced video format.");
+
+      const chunks: Blob[] = [];
+      const recorder = new MediaRecorder(mixed, { mimeType, videoBitsPerSecond: 6_000_000, audioBitsPerSecond: 160_000 });
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+      const finished = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
+
+      const durationSeconds = Number.isFinite(video.duration) ? video.duration : duration;
+      audio.currentTime = 0;
+      video.currentTime = 0;
+      recorder.start(250);
+      await Promise.all([video.play(), audio.play()]);
+      await new Promise<void>((resolve) => {
+        const stop = () => resolve();
+        video.addEventListener("ended", stop, { once: true });
+        window.setTimeout(stop, Math.ceil(durationSeconds * 1000) + 300);
+      });
+      video.pause();
+      audio.pause();
+      if (recorder.state !== "inactive") recorder.stop();
+      await finished;
+
+      const blob = new Blob(chunks, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      setSyncedVideoUrl(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Audio sync failed.");
+    } finally {
+      setSyncingAudio(false);
+    }
+  };
   const shareProject = () => {
     if (!videoUrl) return;
     const payload = { id: `share-${Date.now()}`, prompt, url: videoUrl, createdAt: new Date().toISOString(), aspectRatio, style, duration, model, name: prompt.slice(0, 42), assistant: assistant.name, language };
@@ -214,7 +280,7 @@ export default function Home() {
             {status === "done" && videoUrl && <div className="video-result premium-result">
   <div className="video-head"><div><span className="eyebrow">YOUR KIRAVO WORLD · {assistant.name}</span><h2>Rendered in <em>motion.</em></h2><p className="result-meta">{model} · {style} · {aspectRatio} · {duration}s · {creditLabel}</p></div><span className="ready">READY</span></div>
   <div className="result-stage"><video src={videoUrl} controls autoPlay playsInline className="generated-video" /></div>
-  <div className="result-actions"><a className="download" href={videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><a className="download" href={videoUrl} download>Download ↓</a><button className="retry" onClick={remixProject}>↻ Remix</button><button className="retry" onClick={()=>lastProjectId && router.push(`/editor?project=${encodeURIComponent(lastProjectId)}`)}>✂ Edit</button><button className="retry" onClick={shareProject}>⌁ Share</button><button className="retry" onClick={clearPrompt}>＋ New</button></div>
+  <div className="result-actions"><a className="download" href={syncedVideoUrl || videoUrl} target="_blank" rel="noreferrer">Open video ↗</a><a className="download" href={syncedVideoUrl || videoUrl} download={Boolean(syncedVideoUrl)}>Download ↓</a><label className="download" style={{ cursor: "pointer" }}><input type="file" accept="audio/*" hidden onChange={(e) => { setSyncAudioFile(e.target.files?.[0] || null); setSyncedVideoUrl(""); }} />♫ {syncAudioFile ? syncAudioFile.name : "Add audio"}</label><button className="retry" onClick={syncAudioToVideo} disabled={!syncAudioFile || syncingAudio}>{syncingAudio ? "Syncing…" : syncedVideoUrl ? "✓ Audio synced" : "♫ Sync audio"}</button><button className="retry" onClick={remixProject}>↻ Remix</button><button className="retry" onClick={()=>lastProjectId && router.push(`/editor?project=${encodeURIComponent(lastProjectId)}`)}>✂ Edit</button><button className="retry" onClick={shareProject}>⌁ Share</button><button className="retry" onClick={clearPrompt}>＋ New</button></div>
   <div className="result-insight"><span>✦ {assistant.name} direction</span><p>{prompt}</p></div>
 </div>}
 
