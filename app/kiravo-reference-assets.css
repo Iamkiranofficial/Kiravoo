@@ -172,3 +172,41 @@
     background-position-y:73%!important;
   }
 }
+
+
+/* KIRAVO CROSS-BROWSER MOBILE CONSISTENCY
+   Android/in-app browsers can report a zoomed CSS viewport wider than the physical screen.
+   Treat touch/coarse-pointer devices as mobile so the same layout is used everywhere.
+*/
+@media (hover:none) and (pointer:coarse){
+  .workspace-main{margin-left:0!important}
+  .workspace-sidebar{width:min(310px,88vw)!important;transform:translateX(-105%)!important;transition:transform .28s ease!important;z-index:100!important}
+  .workspace-sidebar.open{transform:translateX(0)!important}
+  .sidebar-scrim{display:block!important}
+  .sidebar-toggle{display:inline-flex!important}
+  .kiravo-topnav{height:70px!important;padding:0 14px!important}
+  .kiravo-wordmark{display:flex!important;font-size:18px!important}
+  .kiravo-wordmark small{font-size:6px!important}
+  .nav-links{display:none!important}
+  .nav-actions .nav-icon:nth-child(1),.nav-actions .nav-icon:nth-child(2){display:none!important}
+  .profile-copy{display:none!important}
+  .hero{padding-top:0!important}
+  .kiravo-hero{min-height:330px!important;margin:0 0 12px!important;border-radius:0!important}
+  .kiravo-hero-copy{padding:38px 18px 0!important;max-width:68%!important}
+  .kiravo-hero-copy h1{font-size:45px!important;line-height:.96!important;max-width:92%!important}
+  .kiravo-hero-copy p{font-size:12px!important;max-width:270px!important}
+  .kiravo-hero-figure{
+    width:72%!important;height:100%!important;right:-4px!important;top:0!important;
+    transform:none!important;opacity:1!important;
+    background-size:230% auto!important;
+    background-position:center top!important;
+  }
+  .premium-composer{margin:0 12px 20px!important;padding:15px!important;border-radius:14px!important}
+  .premium-composer-bottom{flex-wrap:wrap!important}
+  .premium-generate{width:100%!important}
+  .models-section,.showcase-section{padding:0 14px!important}
+  .model-showcase,.showcase-grid{grid-template-columns:1fr 1fr!important;gap:9px!important}
+  .model-card{min-height:150px!important}
+  .showcase-art{height:120px!important}
+  .creator-nav{display:none!important}
+}
