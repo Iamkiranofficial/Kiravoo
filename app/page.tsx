@@ -244,6 +244,37 @@ export default function Home() {
     }
   };
 
+  const assembleFilm = async () => {
+    if (filmBuilding || sceneResults.length < 2) return;
+    setFilmBuilding(true);
+    setStatus("generating");
+    setError("");
+    setStage("Assembling your final film…");
+    try {
+      const response = await fetch("/api/film/concat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls: sceneResults.map((scene) => scene.url) }),
+        cache: "no-store"
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "KIRAVO could not assemble the final film.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setVideoUrl(url);
+      setLastProjectId("film-" + Date.now());
+      setStatus("done");
+      setStage("Final film ready.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Final film assembly failed.");
+      setStatus("error");
+    } finally {
+      setFilmBuilding(false);
+    }
+  };
+
   const enhancePrompt = () => {
     const base = prompt.trim();
     if (!base) return;
@@ -303,7 +334,7 @@ export default function Home() {
               <div className="premium-composer-bottom">
                 <label className={`image-add ${sourceImage ? "selected" : ""}`}><input type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden onChange={(e) => setSourceImage(e.target.files?.[0] || null)} />▧ <span>{sourceImage ? sourceImage.name : "Add Image (Optional)"}</span></label>
                 <span className="prompt-count">{prompt.length}/1000</span>
-                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt" onClick={directPrompt} disabled={!prompt.trim() || directorThinking}>{directorThinking ? "◌ Director thinking…" : "✦ AI Director"}</button><button className="enhance-prompt" onClick={buildFullFilm} disabled={!prompt.trim() || filmBuilding}>{filmBuilding ? "◌ Building scenes…" : "✦ Build Film"}</button><button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance prompt</button>
+                <button className={`tune-button ${advancedOpen ? "active" : ""}`} type="button" onClick={() => setAdvancedOpen((x) => !x)} aria-expanded={advancedOpen}>☷</button><button className="enhance-prompt" onClick={directPrompt} disabled={!prompt.trim() || directorThinking}>{directorThinking ? "◌ Director thinking…" : "✦ AI Director"}</button><button className="enhance-prompt" onClick={buildFullFilm} disabled={!prompt.trim() || filmBuilding}>{filmBuilding ? "◌ Building scenes…" : "✦ Build Film"}</button>{sceneResults.length >= 2 && <button className="enhance-prompt" onClick={assembleFilm} disabled={filmBuilding}>{filmBuilding ? "◌ Assembling…" : "✦ Create Final Film"}</button>}<button className="enhance-prompt quick-enhance" type="button" onClick={enhancePrompt} disabled={!prompt.trim()}>✦ Enhance prompt</button>
                 <button className="premium-generate" onClick={generate} disabled={!prompt.trim() || status === "generating"}><span>✦</span>{status === "generating" ? "Generating…" : sourceImage ? "Animate image" : "Generate"} <b>→</b></button>
               </div>
             </div>
