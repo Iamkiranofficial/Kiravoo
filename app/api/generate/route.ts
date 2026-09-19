@@ -11,9 +11,11 @@ const ltxDurations = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
 const wanDurations = new Set([3, 4, 5, 6, 7, 8]);
 
 function dimensions(aspectRatio: string) {
-  if (aspectRatio === "9:16") return { height: 768, width: 432 };
-  if (aspectRatio === "1:1") return { height: 512, width: 512 };
-  return { height: 432, width: 768 };
+  // Pixazo LTX supports higher native output sizes. Use 720p-class dimensions
+  // instead of the old 432p/512p presets so KIRAVO's default renders are sharper.
+  if (aspectRatio === "9:16") return { height: 1280, width: 720 };
+  if (aspectRatio === "1:1") return { height: 1024, width: 1024 };
+  return { height: 720, width: 1280 };
 }
 
 function workerDimensions(aspectRatio: string) {
