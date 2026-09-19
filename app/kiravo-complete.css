@@ -22,3 +22,14 @@
 .floating-scene:after{background:radial-gradient(circle at 30% 25%,#fff,#f1d18a 18%,#8b3b43 55%,#26100f 82%);box-shadow:0 16px 35px #000b,0 0 34px #d8b36a2b}
 @media(min-width:1400px){.hero{padding-top:100px}.composer{max-width:1160px}.workspace-sidebar{width:270px}.workspace-main{margin-left:270px}.nav{max-width:1440px}.nav-links{gap:34px}}
 @media(max-width:1100px){.workspace-main{margin-left:0}}
+
+
+/* KIRAVO LETTER LOADER */
+.kiravo-loading{position:relative;overflow:hidden;min-height:96px}
+.kiravo-letter-loader{position:relative;width:74px;height:74px;flex:none;display:grid;place-items:center;border:1px solid #d8b36a55;border-radius:50%;background:radial-gradient(circle,#1e1710,#0b0a08 68%);box-shadow:0 0 38px #d8b36a22,inset 0 1px #f1d18a33}
+.kiravo-letter-loader:before{content:"";position:absolute;inset:7px;border:1px solid #8b3b4355;border-top-color:#f1d18a;border-radius:50%;animation:kiravoLoaderSpin 4s linear infinite}
+.kiravo-letter-loader span{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;font-family:Georgia,serif;font-size:12px;font-weight:700;color:#f1d18a;text-align:center;text-shadow:0 0 12px #d8b36a;transform:rotate(calc(var(--i) * 60deg)) translateY(-27px) rotate(calc(var(--i) * -60deg));animation:kiravoLetterOrbit 4s linear infinite}
+.kiravo-letter-loader span:nth-child(1){--i:0}.kiravo-letter-loader span:nth-child(2){--i:1}.kiravo-letter-loader span:nth-child(3){--i:2}.kiravo-letter-loader span:nth-child(4){--i:3}.kiravo-letter-loader span:nth-child(5){--i:4}.kiravo-letter-loader span:nth-child(6){--i:5}
+.kiravo-loading-copy{display:grid;gap:5px;min-width:0}.kiravo-loading-copy .eyebrow{color:#d8b36a}.kiravo-loading-copy strong{font-size:14px;color:#f7f1e7}.kiravo-loading-copy p{margin:0;color:#978d82;font-size:11px;line-height:1.5}
+@keyframes kiravoLoaderSpin{to{transform:rotate(360deg)}}@keyframes kiravoLetterOrbit{to{transform:rotate(calc(var(--i) * 60deg + 360deg)) translateY(-27px) rotate(calc(var(--i) * -60deg - 360deg))}}
+@media(prefers-reduced-motion:reduce){.kiravo-letter-loader:before,.kiravo-letter-loader span{animation:none!important}}
