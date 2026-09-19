@@ -145,7 +145,33 @@ export default function Home() {
           {active === "Projects" && <div className="feature-panel"><h2>Your <em>projects.</em></h2><p className="sub">Saved renders live in this browser.</p>{history.length ? <div className="project-grid">{history.map((x) => <article className="project-card" key={x.id}><video src={x.url} muted playsInline preload="metadata" /><div className="project-card-body"><span className="history-meta">{x.assistant || assistant.name} · {x.language || "Auto-detect"} · {x.model} · {x.duration}s</span><h3>{x.name || x.prompt}</h3><a className="download" href={x.url} target="_blank" rel="noreferrer">Open ↗</a></div></article>)}</div> : <div className="empty-state">No projects yet. Generate your first world in Studio.</div>}</div>}
           {active === "Editor" && <div className="feature-panel"><h2>Motion <em>editor.</em></h2><p className="sub">Open a generated video from Studio to continue editing.</p>{videoUrl ? <video src={videoUrl} controls playsInline className="generated-video" /> : <div className="empty-state">Generate a video first, then use the result in your workflow.</div>}</div>}
           {active === "History" && <div className="feature-panel"><h2>Recent <em>worlds.</em></h2>{history.length ? <div className="history-grid">{history.map((x) => <article key={x.id}><video src={x.url} muted playsInline controls preload="metadata" /><div><span className="history-meta">{x.assistant || assistant.name} · {x.language || "Auto-detect"} · {x.model} · {x.duration}s</span><p>{x.name || x.prompt}</p></div></article>)}</div> : <div className="empty-state">No renders yet.</div>}</div>}
-          {active === "Explore" && <div className="feature-panel"><h2>One brain. <em>Six personalities.</em></h2><p className="sub">Every KIRAVO assistant can create, direct, edit, research, write, design and build in any language.</p><div className="cards">{assistants.map((x) => <article key={x.id}><div className="icon">{x.orb}</div><h3>{x.name}</h3><span className="history-meta">{x.gender} · {x.tag}</span><p>{x.description}</p><button className="download" onClick={() => { chooseAssistant(x); navigate("Studio"); }}>Create with {x.name} ↗</button></article>)}</div></div>}
+          {active === "Explore" && <div className="explore-page">
+  <div className="explore-head">
+    <div><span className="eyebrow">KIRAVO VISUAL LIBRARY · CURATED WORLDS</span><h2>Explore <em>the impossible.</em></h2><p className="sub">A living gallery of cinematic worlds, characters, products and stories created inside KIRAVO.</p></div>
+    <button className="explore-create" onClick={() => navigate("Studio")}>Create something ↗</button>
+  </div>
+  <div className="explore-filters">{["All","Cinematic","Portrait","Fashion","Architecture","Fantasy","Automotive","India"].map((x,i)=><button key={x} className={i===0?"active":""}>{x}</button>)}</div>
+  <div className="explore-feature">
+    <div className="explore-visual visual-hero"><span className="visual-kicker">FEATURED WORLD · KIRAVO CINEMA</span><div><strong>Golden hour<br/>over Hyderabad.</strong><p>Atmospheric · Cinematic · 16:9</p></div><button onClick={()=>{setPrompt("A cinematic aerial shot over Hyderabad at golden hour, warm atmospheric haze, elegant film lighting");navigate("Studio")}}>Use this direction ↗</button></div>
+    <div className="explore-feature-copy"><span className="history-meta">EDITOR'S PICK · SEPTEMBER 2026</span><h3>Where reality meets imagination.</h3><p>Discover visual directions and turn any frame into your next KIRAVO creation.</p><div className="explore-stats"><span><b>50+</b> worlds</span><span><b>8</b> styles</span><span><b>24</b> moods</span></div></div>
+  </div>
+  <div className="explore-grid">
+    {[
+      ["Midnight Couture","Fashion · Editorial","visual-couture","Fashion"],
+      ["Desert Monolith","Architecture · Cinema","visual-desert","Architecture"],
+      ["Neon Pursuit","Automotive · Motion","visual-auto","Automotive"],
+      ["The Last Garden","Fantasy · Dreamy","visual-garden","Fantasy"],
+      ["Royal Portrait","Portrait · Realistic","visual-portrait","Portrait"],
+      ["Monsoon City","India · Cinematic","visual-india","India"],
+      ["Chrome Future","Sci-Fi · Commercial","visual-chrome","Cinematic"],
+      ["Moonlit Palace","Fantasy · Architecture","visual-palace","Fantasy"]
+    ].map(([title,meta,visual,tag],i)=><article className="explore-card" key={title}>
+      <div className={`explore-art ${visual}`}><span className="art-tag">{tag}</span><button aria-label={`Create similar to ${title}`} onClick={()=>{setPrompt(`Create a cinematic visual inspired by ${title}, ${meta}, premium lighting, high detail`);navigate("Studio")}}>↗</button><span className="art-grain"/></div>
+      <div className="explore-card-body"><div><span className="history-meta">{meta}</span><h3>{title}</h3></div><span className="art-index">0{i+1}</span></div>
+    </article>)}
+  </div>
+  <div className="explore-assistants"><div><span className="eyebrow">CREATE WITH A DIRECTOR</span><h3>Six minds. One visual language.</h3></div><div className="explore-assistant-row">{assistants.map(x=><button key={x.id} onClick={()=>{chooseAssistant(x);navigate("Studio")}}><span>{x.orb}</span><div><b>{x.name}</b><small>{x.tag}</small></div>↗</button>)}</div></div>
+</div>}
           {active === "Settings" && <div className="feature-panel"><h2>Personalize <em>KIRAVO.</em></h2><p className="sub">Choose your AI partner and language.</p><div className="settings-grid"><label>AI assistant<select value={assistant.id} onChange={(e) => { const x = assistants.find((a) => a.id === e.target.value); if (x) chooseAssistant(x); }}>{assistants.map((x) => <option key={x.id} value={x.id}>{x.name} · {x.gender}</option>)}</select></label><label>Language<select value={language} onChange={(e) => chooseLanguage(e.target.value)}>{languages.map((x) => <option key={x}>{x}</option>)}</select></label></div></div>}
         </section>
       </div>
