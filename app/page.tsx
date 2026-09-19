@@ -75,7 +75,15 @@ export default function Home() {
 
   const chooseAssistant = (x: Assistant) => { setAssistant(x); localStorage.setItem("kiravo-assistant", x.id); setAssistantOpen(false); };
   const chooseLanguage = (x: string) => { setLanguage(x); localStorage.setItem("kiravo-language", x); };
-  const navigate = (x: string) => { setActive(x); setSidebarOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const navigate = (x: string) => {
+    const update = () => { setActive(x); setSidebarOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); };
+    const doc = document as Document & { startViewTransition?: (callback: () => void) => unknown };
+    if (doc.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      doc.startViewTransition(update);
+    } else {
+      update();
+    }
+  };
   const saveHistory = (project: Project) => setHistory((cur) => { const next = [project, ...cur.filter((x) => x.id !== project.id)].slice(0, 20); localStorage.setItem("kiravo-history", JSON.stringify(next)); return next; });
 
   async function waitForVideo(id: string, meta?: Partial<Project>) {
