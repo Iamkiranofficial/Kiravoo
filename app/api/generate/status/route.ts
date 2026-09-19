@@ -1,3 +1,5 @@
+import { getPixazoStatus, pixazoPollingUrlFromJobId } from "@/lib/pixazo";
+
 const MAGIC_HOUR_API = "https://api.magichour.ai";
 const HF_SPACE = "https://lightricks-ltx-video-distilled.hf.space";
 const HF_LTX23_SPACE = "https://lightricks-ltx-2-3.hf.space";
@@ -61,10 +63,61 @@ async function readKaggleJob(jobId: string) {
   const url = typeof data?.url === "string" && data.url.startsWith("/") ? baseUrl + data.url : data?.url || null;
   return Response.json({ id: jobId, status: data?.status || "processing", url, error: data?.error || null, provider: "kaggle" });
 }
+function findVideoUrl(value: unknown): string | null {
+  if (typeof value === "string" && /^https?:\\/\\//.test(value)) {
+    return value;
+  }
+  if (!value || typeof value !== "object") return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findVideoUrl(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  const item = value as Record<string, unknown>;
+  for (const key of ["video_url", "videoUrl", "url", "download_url", "downloadUrl"]) {
+    const candidate = item[key];
+    if (typeof candidate === "string" && /^https?:\\/\\//.test(candidate)) return candidate;
+  }
+  for (const key of ["data", "result", "output", "video"]) {
+    const found = findVideoUrl(item[key]);
+    if (found) return found;
+  }
+  return null;
+}
+
+async function readPixazoJob(jobId: string) {
+  const pollingUrl = pixazoPollingUrlFromJobId(jobId);
+  const data = await getPixazoStatus(pollingUrl);
+  const rawStatus = String(data?.status || data?.state || "PROCESSING").toUpperCase();
+
+  if (rawStatus === "FAILED" || rawStatus === "ERROR" || rawStatus === "CANCELED" || rawStatus === "CANCELLED") {
+    const error = typeof data?.error === "string" ? data.error :
+      typeof data?.message === "string" ? data.message : "Pixazo video generation failed.";
+    return Response.json({ status: "error", url: null, error, provider: "pixazo" });
+  }
+
+  if (rawStatus === "COMPLETED" || rawStatus === "COMPLETE" || rawStatus === "SUCCEEDED" || rawStatus === "SUCCESS") {
+    const url = findVideoUrl(data);
+    if (!url) {
+      return Response.json({ status: "error", url: null, error: "Pixazo completed the job but returned no video URL.", provider: "pixazo" });
+    }
+    return Response.json({ status: "complete", url, provider: "pixazo" });
+  }
+
+  return Response.json({
+    status: rawStatus.includes("QUEUE") ? "queued" : "processing",
+    url: null,
+    provider: "pixazo",
+  });
+}
+
 export async function GET(request: Request) {
   try {
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return Response.json({ error: "Missing video job id." }, { status: 400 });
+    if (id.startsWith("px:")) return readPixazoJob(id);
     if (id.startsWith("kg:")) return readKaggleJob(id.slice(3));
     if (id.startsWith("hf:ltx23:")) return readFreeJob(id.slice(9), HF_LTX23_SPACE, "generate_video");
     if (id.startsWith("hf:ltx:")) return readFreeJob(id.slice(7), HF_SPACE, "text_to_video");
