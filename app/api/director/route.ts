@@ -12,6 +12,14 @@ type DirectorBody = {
 
 function fallback(body: DirectorBody) {
   const idea = String(body.prompt || "").trim();
+  const style = String(body.style || "Cinematic");
+  const ratio = String(body.aspectRatio || "16:9");
+  const scenePrompts = [
+    `Opening shot: establish the world and introduce the main subject from this idea: ${idea}. ${style} visual style, cinematic lighting, ${ratio} composition, smooth camera movement.`,
+    `Build-up shot: show the main action developing naturally from this idea: ${idea}. Maintain the same subject, wardrobe, environment and visual identity. ${style} style, ${ratio} composition.`,
+    `Hero shot: emphasize the most memorable visual moment from this idea: ${idea}. Preserve character and environment continuity, detailed lighting and deliberate camera movement.`,
+    `Closing shot: resolve the story with a strong final composition based on this idea: ${idea}. Maintain visual continuity, cinematic atmosphere and natural motion.`
+  ];
   return NextResponse.json({
     prompt: idea,
     plan: "KIRAVO will shape the idea into a cinematic four-beat sequence.",
@@ -21,7 +29,7 @@ function fallback(body: DirectorBody) {
       "Hero moment: emphasize the key visual beat.",
       "Resolution: close with a memorable cinematic composition."
     ],
-    scenePrompts: [],
+    scenePrompts,
     worldBible: {},
     continuity: []
   });
@@ -90,13 +98,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Gemini returned an empty Director response." }, { status: 502 });
     }
 
-    const data = JSON.parse(text);
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return fallback(body);
+    }
+
+    const scenes = Array.isArray(data.scenes)
+      ? data.scenes.filter((item: unknown) => typeof item === "string" && item.trim().length > 0).slice(0, 4)
+      : [];
+    const scenePrompts = Array.isArray(data.scenePrompts)
+      ? data.scenePrompts.filter((item: unknown) => typeof item === "string" && item.trim().length > 0).slice(0, 4)
+      : [];
+
+    if (scenes.length !== 4 || scenePrompts.length !== 4) return fallback(body);
 
     return NextResponse.json({
       prompt: String(data.prompt || idea).slice(0, 6000),
       plan: String(data.plan || "").slice(0, 1000),
-      scenes: Array.isArray(data.scenes) ? data.scenes.slice(0, 4).map(String) : [],
-      scenePrompts: Array.isArray(data.scenePrompts) ? data.scenePrompts.slice(0, 4).map(String) : [],
+      scenes,
+      scenePrompts,
       worldBible: data.worldBible && typeof data.worldBible === "object" ? data.worldBible : {},
       continuity: Array.isArray(data.continuity) ? data.continuity.slice(0, 10).map(String) : []
     });

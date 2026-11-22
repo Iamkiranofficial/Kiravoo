@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import "./motion.module.css";
 import "./kiravo-complete.css";
 import "./kiravo-reference-assets.css";
+import { saveRenderJob, updateRenderJob } from "@/lib/render-jobs";
 
 type Status = "idle" | "generating" | "done" | "error";
 type Assistant = { id: string; name: string; gender: string; tag: string; description: string; greeting: string; orb: string };
@@ -112,21 +113,41 @@ export default function Home() {
   };
   const saveHistory = (project: Project) => setHistory((cur) => { const next = [project, ...cur.filter((x) => x.id !== project.id)].slice(0, 20); localStorage.setItem("kiravo-history", JSON.stringify(next)); return next; });
 
-  async function waitForVideo(id: string, meta?: Partial<Project>) {
+  async function waitForVideo(
+    id: string,
+    meta?: Partial<Project> & { provider?: string }
+  ) {
     const started = Date.now();
-    while (Date.now() - started < 900000) {
-      const response = await fetch(`/api/generate/status?id=${encodeURIComponent(id)}`, { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not check the render status.");
-      if (data.status === "complete" && data.url) {
-        const project: Project = { id, prompt: meta?.prompt || prompt.trim(), url: data.url, createdAt: new Date().toISOString(), aspectRatio: meta?.aspectRatio || aspectRatio, style: meta?.style || style, duration: meta?.duration || duration, model: meta?.model || model, name: meta?.name || (meta?.prompt || prompt).slice(0, 42), assistant: assistant.name, language };
-        setVideoUrl(data.url); setLastProjectId(id); setStatus("done"); saveHistory(project); return;
+    saveRenderJob({
+      id,
+      prompt: meta?.prompt || prompt.trim(),
+      status: "queued",
+      createdAt: new Date().toISOString(),
+      model: meta?.model || model,
+      duration: meta?.duration || duration,
+      aspectRatio: meta?.aspectRatio || aspectRatio,
+      provider: meta?.provider,
+    });
+    try {
+      while (Date.now() - started < 900000) {
+        const response = await fetch(`/api/generate/status?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not check the render status.");
+        if (data.status === "complete" && data.url) {
+          const project: Project = { id, prompt: meta?.prompt || prompt.trim(), url: data.url, createdAt: new Date().toISOString(), aspectRatio: meta?.aspectRatio || aspectRatio, style: meta?.style || style, duration: meta?.duration || duration, model: meta?.model || model, name: meta?.name || (meta?.prompt || prompt).slice(0, 42), assistant: assistant.name, language };
+          updateRenderJob(id, { status: "complete", url: data.url });
+          setVideoUrl(data.url); setLastProjectId(id); setStatus("done"); saveHistory(project); return;
+        }
+        if (data.status === "error" || data.status === "canceled") throw new Error(data.error || "The render did not complete.");
+        updateRenderJob(id, { status: data.status === "queued" ? "queued" : "processing" });
+        setStage(data.status === "queued" ? "Your render is queued…" : "Rendering your world…");
+        await new Promise<void>((resolve) => { timer.current = setTimeout(resolve, 3000); });
       }
-      if (data.status === "error" || data.status === "canceled") throw new Error(data.error || "The render did not complete.");
-      setStage(data.status === "queued" ? "Your render is queued…" : "Rendering your world…");
-      await new Promise<void>((resolve) => { timer.current = setTimeout(resolve, 3000); });
+      throw new Error("The render is taking longer than expected. Please try again.");
+    } catch (error) {
+      updateRenderJob(id, { status: "failed", error: error instanceof Error ? error.message : "Render failed." });
+      throw error;
     }
-    throw new Error("The render is taking longer than expected. Please try again.");
   }
 
   async function generate() {
@@ -152,7 +173,10 @@ export default function Home() {
       try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`KIRAVO server returned invalid JSON (HTTP ${response.status}).`); }
       if (!response.ok || !data.id) throw new Error(data.error || "KIRAVO could not start the video.");
       setCreditLabel(data.creditsCharged === 0 ? "Free" : typeof data.creditsCharged === "number" ? `${data.creditsCharged} credits` : "Auto");
-      await waitForVideo(data.id, sourceImage ? { prompt: value, duration, model: data.model || model, aspectRatio, style } : undefined);
+      await waitForVideo(data.id, {
+        ...(sourceImage ? { prompt: value, duration, model: data.model || model, aspectRatio, style } : {}),
+        provider: data.provider,
+      });
     } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); setStatus("error"); }
   }
 
@@ -223,22 +247,48 @@ export default function Home() {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.id) throw new Error(data.error || "Scene " + (i + 1) + " could not start.");
+        saveRenderJob({
+          id: data.id,
+          prompt: prompts[i],
+          status: "queued",
+          createdAt: new Date().toISOString(),
+          model: data.model || "ltx-2.3",
+          duration,
+          aspectRatio,
+          provider: data.provider,
+        });
         const started = Date.now();
         let finished = false;
         while (Date.now() - started < 900000) {
           const statusResponse = await fetch("/api/generate/status?id=" + encodeURIComponent(data.id), { cache: "no-store" });
           const statusData = await statusResponse.json().catch(() => ({}));
-          if (!statusResponse.ok) throw new Error(statusData.error || "Could not check scene " + (i + 1) + ".");
+          if (!statusResponse.ok) {
+            const message = statusData.error || "Could not check scene " + (i + 1) + ".";
+            updateRenderJob(data.id, { status: "failed", error: message });
+            throw new Error(message);
+          }
           if (statusData.status === "complete" && statusData.url) {
             completed.push({ scene: i + 1, url: statusData.url });
+            updateRenderJob(data.id, { status: "complete", url: statusData.url });
             setSceneResults([...completed]);
             finished = true;
             break;
           }
-          if (statusData.status === "error" || statusData.status === "canceled") throw new Error(statusData.error || "Scene " + (i + 1) + " failed.");
+          updateRenderJob(data.id, {
+            status: statusData.status === "queued" ? "queued" : "processing",
+          });
+          if (statusData.status === "error" || statusData.status === "canceled") {
+            const message = statusData.error || "Scene " + (i + 1) + " failed.";
+            updateRenderJob(data.id, { status: "failed", error: message });
+            throw new Error(message);
+          }
           await new Promise<void>((resolve) => { timer.current = setTimeout(resolve, 3000); });
         }
-        if (!finished) throw new Error("Scene " + (i + 1) + " timed out.");
+        if (!finished) {
+          const message = "Scene " + (i + 1) + " timed out.";
+          updateRenderJob(data.id, { status: "failed", error: message });
+          throw new Error(message);
+        }
       }
       setStage("All scenes generated.");
       setStatus("done");
@@ -309,7 +359,14 @@ export default function Home() {
     try {
       const form = new FormData(); form.append("mode", mediaMode); form.append("image", mediaImage); if (mediaAudio) form.append("audio", mediaAudio); form.append("prompt", mediaPrompt); form.append("duration", String(mediaDuration)); form.append("model", model); form.append("assistant", assistant.id); form.append("language", language);
       const response = await fetch("/api/generate/media", { method: "POST", body: form }); const data = await response.json(); if (!response.ok || !data.id) throw new Error(data.error || "KIRAVO could not start the media render.");
-      await waitForVideo(data.id, { prompt: mediaPrompt || `${mediaMode === "image" ? "Image to Video" : "Voice to Video"} · ${mediaImage.name}`, duration: mediaDuration, model: data.model || model, aspectRatio: "16:9", style: "Cinematic" });
+      await waitForVideo(data.id, {
+        prompt: mediaPrompt || `${mediaMode === "image" ? "Image to Video" : "Voice to Video"} · ${mediaImage.name}`,
+        duration: mediaDuration,
+        model: data.model || model,
+        aspectRatio: "16:9",
+        style: "Cinematic",
+        provider: data.provider,
+      });
     } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); setStatus("error"); }
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { renderJobsUpdatedEvent } from "@/lib/render-jobs";
 
 type RenderJob = {
   id: string;
@@ -25,7 +26,17 @@ export default function DashboardPage() {
     } catch { setJobs([]); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const refresh = () => load();
+    const eventName = renderJobsUpdatedEvent();
+    window.addEventListener(eventName, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(eventName, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(async () => {
@@ -57,6 +68,7 @@ export default function DashboardPage() {
 
   const active = jobs.filter(j => ["queued","processing","generating"].includes(j.status));
   const completed = jobs.filter(j => j.status === "complete" && j.url);
+  const failed = jobs.filter(j => j.status === "failed");
 
   return <main className="dashboard">
     <style>{styles}</style>
@@ -87,7 +99,7 @@ export default function DashboardPage() {
       <div className="section-head"><div><span className="kicker">LIVE QUEUE</span><h2>Rendering now</h2></div><button onClick={load}>{refreshing ? "Refreshing…" : "Refresh"}</button></div>
       {active.length === 0 ? <div className="quiet">No active renders right now.</div> : <div className="render-list">{active.map(job => <article className="render-card" key={job.id}>
         <div className="render-preview"><div className="loader"><span>K</span></div><b>{job.status === "queued" ? "QUEUED" : "RENDERING"}</b></div>
-        <div className="render-info"><div className="meta"><span>{job.model || "Video"}</span><span>{job.aspectRatio || "16:9"}</span><span>{job.duration || 5}s</span></div><h3>{job.prompt}</h3><p>AI engine is processing your cinematic render. This page checks automatically every 3 seconds.</p><div className="progress"><i /></div></div>
+        <div className="render-info"><div className="meta"><span>{job.model || "Video"}</span><span>{job.aspectRatio || "16:9"}</span><span>{job.duration || 5}s</span></div><h3>{job.prompt}</h3><p>AI engine is processing your cinematic render. This page checks automatically every 3 seconds.</p></div>
       </article>)}</div>}
 
       <div className="section-head ready-head"><div><span className="kicker">YOUR OUTPUTS</span><h2>Rendered videos</h2></div></div>
@@ -95,6 +107,18 @@ export default function DashboardPage() {
         <div className="video-wrap"><video src={job.url} controls playsInline preload="metadata" /></div>
         <div className="video-body"><span className="ready">READY · {job.model || "VIDEO"}</span><h3>{job.prompt}</h3><p>{job.duration || 5}s · {job.aspectRatio || "16:9"}</p><div className="actions"><a href={job.url} target="_blank" rel="noreferrer">Open ↗</a><a href={job.url} download>Download ↓</a></div></div>
       </article>)}</div>}
+      {failed.length > 0 && <>
+        <div className="section-head ready-head"><div><span className="kicker">NEEDS ATTENTION</span><h2>Failed renders</h2></div></div>
+        <div className="render-list">
+          {failed.map(job => <article className="render-card" key={job.id}>
+            <div className="render-preview"><b>FAILED</b></div>
+            <div className="render-info">
+              <div className="meta"><span>{job.model || "Video"}</span><span>{job.aspectRatio || "16:9"}</span><span>{job.duration || 5}s</span></div>
+              <h3>{job.prompt}</h3><p>{job.error || "This render could not be completed."}</p>
+            </div>
+          </article>)}
+        </div>
+      </>}
     </section>}
   </main>;
 }
